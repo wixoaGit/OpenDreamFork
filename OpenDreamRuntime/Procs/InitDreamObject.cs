@@ -5,6 +5,8 @@ namespace OpenDreamRuntime.Procs {
     sealed class InitDreamObjectState : ProcState {
         public static readonly Stack<InitDreamObjectState> Pool = new();
 
+        public override nuint TracyLocationId => _dreamObject.ObjectDefinition.LocationId;
+
         private readonly IDreamManager _dreamMan;
         private readonly IDreamObjectTree _objectTree;
 

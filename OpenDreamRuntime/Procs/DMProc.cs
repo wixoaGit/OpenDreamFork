@@ -8,6 +8,7 @@ using OpenDreamRuntime.Resources;
 using OpenDreamShared.Dream;
 using OpenDreamShared.Dream.Procs;
 using OpenDreamShared.Json;
+using PER.Tracy;
 
 namespace OpenDreamRuntime.Procs {
     sealed class DMProc : DreamProc {
@@ -25,6 +26,8 @@ namespace OpenDreamRuntime.Procs {
 
         private readonly int _maxStackSize;
 
+        public readonly nuint LocationId;
+
         public DMProc(DreamPath owningType, ProcDefinitionJson json, string? name, IDreamManager dreamManager, IDreamMapManager dreamMapManager, IDreamDebugManager dreamDebugManager, DreamResourceManager dreamResourceManager, IDreamObjectTree objectTree)
             : base(owningType, name ?? json.Name, null, json.Attributes, GetArgumentNames(json), GetArgumentTypes(json), json.VerbName, json.VerbCategory, json.VerbDesc, json.Invisibility) {
             Bytecode = json.Bytecode ?? Array.Empty<byte>();
@@ -38,6 +41,8 @@ namespace OpenDreamRuntime.Procs {
             DreamDebugManager = dreamDebugManager;
             DreamResourceManager = dreamResourceManager;
             ObjectTree = objectTree;
+
+            LocationId = ProfilerInternal.CreateLocation(ToString(), Source, (uint)Line);
         }
 
         public override DMProcState CreateState(DreamThread thread, DreamObject? src, DreamObject? usr, DreamProcArguments arguments) {
@@ -212,6 +217,8 @@ namespace OpenDreamRuntime.Procs {
         public override DMProc Proc => _proc;
 
         public override (string?, int?) SourceLine => (CurrentSource, CurrentLine);
+
+        public override nuint TracyLocationId => _proc.LocationId;
 
         /// Static initializer for maintainer friendly OpcodeHandlers to performance friendly _opcodeHandlers
         static DMProcState() {

@@ -6,6 +6,7 @@ using OpenDreamRuntime.Procs;
 using OpenDreamRuntime.Procs.DebugAdapter;
 using OpenDreamShared.Dream;
 using OpenDreamShared.Dream.Procs;
+using PER.Tracy;
 
 namespace OpenDreamRuntime {
     public enum ProcStatus {
@@ -134,6 +135,10 @@ namespace OpenDreamRuntime {
 
         public abstract DreamProc? Proc { get; }
 
+        public abstract nuint TracyLocationId { get; }
+        public nuint TracyZoneId { get; set; }
+        public bool TracyZoned { get; set; }
+
         protected void Initialize(DreamThread thread, bool waitFor) {
             Thread = thread;
             WaitFor = waitFor;
@@ -228,6 +233,10 @@ namespace OpenDreamRuntime {
                     ProcStatus status;
                     try {
                         // _current.Resume may mutate our state!!!
+                        if (!_current.TracyZoned) {
+                            _current.TracyZoneId = ProfilerInternal.StartScopedZone(_current.TracyLocationId);
+                            _current.TracyZoned = true;
+                        }
                         status = _current.Resume();
                     } catch (DMCrashRuntime dmCrashRuntime) {
                         //skip one level on the call stack because crash is being treated as an actual proc
@@ -249,13 +258,29 @@ namespace OpenDreamRuntime {
                         // The entire Thread is stopping
                         case ProcStatus.Cancelled:
                             var current = _current;
+                            if (_current.TracyZoned) {
+                                ProfilerInternal.EndScopedZone(_current.TracyZoneId);
+                                _current.TracyZoned = false;
+                            }
+
                             _current = null;
+                            foreach (var s in _stack) {
+                                if (!s.TracyZoned)
+                                    continue;
+                                ProfilerInternal.EndScopedZone(s.TracyZoneId);
+                                s.TracyZoned = false;
+                            }
                             _stack.Clear();
                             return current.Result;
 
                         // Our top-most proc just returned a value
                         case ProcStatus.Returned:
                             var returned = _current.Result;
+                            if (_current.TracyZoned) {
+                                ProfilerInternal.EndScopedZone(_current.TracyZoneId);
+                                _current.TracyZoned = false;
+                            }
+
                             PopProcState();
 
                             // If our stack is empty, the context has finished execution

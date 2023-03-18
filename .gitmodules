@@ -1,3 +1,6 @@
 [submodule "RobustToolbox"]
 	path = RobustToolbox
 	url = https://github.com/space-wizards/RobustToolbox.git
+[submodule "PER.Tracy"]
+	path = PER.Tracy
+	url = https://github.com/cgytrus/PER.Tracy

@@ -1,6 +1,7 @@
 ﻿using OpenDreamRuntime.Input;
 using OpenDreamRuntime.Procs.DebugAdapter;
 using OpenDreamShared;
+using PER.Tracy;
 using Robust.Server.ServerStatus;
 using Robust.Shared;
 using Robust.Shared.Configuration;
@@ -68,6 +69,7 @@ namespace OpenDreamRuntime {
                 _commandSystem!.RunRepeatingCommands();
                 _dreamManager.Update();
                 _debugManager.Update();
+                ProfilerInternal.FrameMark();
             }
         }
     }
