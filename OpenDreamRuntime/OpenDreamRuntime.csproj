@@ -9,7 +9,12 @@
   <Import Project="..\RobustToolbox\MSBuild\Robust.DefineConstants.targets" />
   <ItemGroup>
     <ProjectReference Include="..\OpenDreamShared\OpenDreamShared.csproj" />
+    <ProjectReference Include="..\PER.Tracy\PER.Tracy\PER.Tracy.csproj" />
     <ProjectReference Include="..\RobustToolbox\Robust.Server\Robust.Server.csproj" />
   </ItemGroup>
   <Import Project="..\RobustToolbox\MSBuild\Robust.Analyzers.targets" />
+
+  <PropertyGroup>
+    <DefineConstants>TracyEnable</DefineConstants>
+  </PropertyGroup>
 </Project>

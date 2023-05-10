@@ -5,6 +5,7 @@ using OpenDreamRuntime.Objects;
 using OpenDreamRuntime.Resources;
 using OpenDreamShared.Dream;
 using OpenDreamShared.Dream.Procs;
+using PER.Tracy;
 
 namespace OpenDreamRuntime.Procs {
     public sealed class NativeProc : DreamProc {
@@ -41,6 +42,8 @@ namespace OpenDreamRuntime.Procs {
             public DreamProcArguments Arguments => new(_arguments.AsSpan(0, _argumentCount));
             private readonly DreamValue[] _arguments = new DreamValue[128];
             private int _argumentCount;
+
+            public override nuint TracyLocationId => _proc._locationId;
 
             private NativeProc _proc = default!;
             public override NativeProc Proc => _proc;
@@ -100,6 +103,8 @@ namespace OpenDreamRuntime.Procs {
         private readonly Dictionary<string, DreamValue>? _defaultArgumentValues;
         private readonly HandlerFn _handler;
 
+        private readonly nuint _locationId;
+
         public NativeProc(DreamPath owningType, string name, List<String> argumentNames, Dictionary<string, DreamValue> defaultArgumentValues, HandlerFn handler, IDreamManager dreamManager, IAtomManager atomManager, IDreamMapManager mapManager, DreamResourceManager resourceManager, IDreamObjectTree objectTree)
             : base(owningType, name, null, ProcAttributes.None, argumentNames, null, null, null, null, null) {
             _defaultArgumentValues = defaultArgumentValues;
@@ -110,6 +115,8 @@ namespace OpenDreamRuntime.Procs {
             _mapManager = mapManager;
             _resourceManager = resourceManager;
             _objectTree = objectTree;
+
+            _locationId = ProfilerInternal.CreateLocation(name, "NativeProcs.cs", 0);
         }
 
         public override State CreateState(DreamThread thread, DreamObject? src, DreamObject? usr, DreamProcArguments arguments) {

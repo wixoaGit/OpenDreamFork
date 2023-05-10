@@ -1,6 +1,7 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 using OpenDreamRuntime.Objects.MetaObjects;
 using OpenDreamShared.Dream;
+using PER.Tracy;
 
 namespace OpenDreamRuntime.Objects {
     public sealed class DreamObjectDefinition {
@@ -15,6 +16,8 @@ namespace OpenDreamRuntime.Objects {
         public readonly Dictionary<string, int> Procs = new();
         public readonly Dictionary<string, int> OverridingProcs = new();
         public List<int>? Verbs;
+
+        public readonly nuint LocationId;
 
         // Maps variables from their name to their initial value.
         public readonly Dictionary<string, DreamValue> Variables = new();
@@ -34,6 +37,8 @@ namespace OpenDreamRuntime.Objects {
             OverridingProcs = new Dictionary<string, int>(copyFrom.OverridingProcs);
             if (copyFrom.Verbs != null)
                 Verbs = new List<int>(copyFrom.Verbs);
+
+            LocationId = copyFrom.LocationId;
         }
 
         public DreamObjectDefinition(IDreamManager dreamManager, IDreamObjectTree objectTree, IDreamObjectTree.TreeEntry treeEntry) {
@@ -48,6 +53,8 @@ namespace OpenDreamRuntime.Objects {
                 if (Parent.Verbs != null)
                     Verbs = new List<int>(Parent.Verbs);
             }
+
+            LocationId = ProfilerInternal.CreateLocation($"new {Type}", "DreamObject.cs", 0);
         }
 
         public void SetVariableDefinition(string variableName, DreamValue value) {

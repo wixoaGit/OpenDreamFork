@@ -6,6 +6,7 @@ using OpenDreamRuntime.Objects;
 using OpenDreamRuntime.Resources;
 using OpenDreamShared.Dream;
 using OpenDreamShared.Dream.Procs;
+using PER.Tracy;
 
 namespace OpenDreamRuntime.Procs {
     public sealed class AsyncNativeProc : DreamProc {
@@ -17,6 +18,8 @@ namespace OpenDreamRuntime.Procs {
 
             private readonly DreamValue[] _arguments = new DreamValue[128];
             private int _argumentCount;
+
+            public override nuint TracyLocationId => _proc._locationId;
 
             private AsyncNativeProc? _proc;
             public override DreamProc? Proc => _proc;
@@ -191,10 +194,13 @@ namespace OpenDreamRuntime.Procs {
         private readonly Dictionary<string, DreamValue>? _defaultArgumentValues;
         private readonly Func<State, Task<DreamValue>> _taskFunc;
 
+        private readonly nuint _locationId;
+
         public AsyncNativeProc(DreamPath owningType, string name, List<String> argumentNames, Dictionary<string, DreamValue> defaultArgumentValues, Func<State, Task<DreamValue>> taskFunc, IDreamManager dreamManager, DreamResourceManager resourceManager, IDreamObjectTree objectTree)
             : base(owningType, name, null, ProcAttributes.None, argumentNames, null, null, null, null, null) {
             _defaultArgumentValues = defaultArgumentValues;
             _taskFunc = taskFunc;
+            _locationId = ProfilerInternal.CreateLocation(name, "NativeProcs.cs", 0);
 
             _dreamManager = dreamManager;
             _resourceManager = resourceManager;
