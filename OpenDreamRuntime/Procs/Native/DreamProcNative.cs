@@ -1,7 +1,7 @@
 ﻿using OpenDreamRuntime.Objects;
 
 namespace OpenDreamRuntime.Procs.Native {
-    static class DreamProcNative {
+    internal static class DreamProcNative {
         public static void SetupNativeProcs(IDreamObjectTree objectTree) {
             objectTree.SetGlobalNativeProc(DreamProcNativeRoot.NativeProc_abs);
             objectTree.SetGlobalNativeProc(DreamProcNativeRoot.NativeProc_alert);
@@ -127,12 +127,16 @@ namespace OpenDreamRuntime.Procs.Native {
             objectTree.SetNativeProc(objectTree.List, DreamProcNativeList.NativeProc_Cut);
             objectTree.SetNativeProc(objectTree.List, DreamProcNativeList.NativeProc_Find);
             objectTree.SetNativeProc(objectTree.List, DreamProcNativeList.NativeProc_Insert);
+            objectTree.SetNativeProc(objectTree.List, DreamProcNativeList.NativeProc_Join);
             objectTree.SetNativeProc(objectTree.List, DreamProcNativeList.NativeProc_Remove);
             objectTree.SetNativeProc(objectTree.List, DreamProcNativeList.NativeProc_Swap);
 
+            objectTree.SetNativeProc(objectTree.Matrix, DreamProcNativeMatrix.NativeProc_Add);
             objectTree.SetNativeProc(objectTree.Matrix, DreamProcNativeMatrix.NativeProc_Invert);
             objectTree.SetNativeProc(objectTree.Matrix, DreamProcNativeMatrix.NativeProc_Multiply);
             objectTree.SetNativeProc(objectTree.Matrix, DreamProcNativeMatrix.NativeProc_Scale);
+            objectTree.SetNativeProc(objectTree.Matrix, DreamProcNativeMatrix.NativeProc_Subtract);
+            objectTree.SetNativeProc(objectTree.Matrix, DreamProcNativeMatrix.NativeProc_Translate);
             objectTree.SetNativeProc(objectTree.Matrix, DreamProcNativeMatrix.NativeProc_Turn);
 
             objectTree.SetNativeProc(objectTree.Regex, DreamProcNativeRegex.NativeProc_Find);
@@ -150,7 +154,29 @@ namespace OpenDreamRuntime.Procs.Native {
 
             objectTree.SetNativeProc(objectTree.World, DreamProcNativeWorld.NativeProc_Export);
             objectTree.SetNativeProc(objectTree.World, DreamProcNativeWorld.NativeProc_GetConfig);
+            objectTree.SetNativeProc(objectTree.World, DreamProcNativeWorld.NativeProc_Profile);
             objectTree.SetNativeProc(objectTree.World, DreamProcNativeWorld.NativeProc_SetConfig);
+
+            SetOverridableNativeProc(objectTree, objectTree.World, DreamProcNativeWorld.NativeProc_Reboot);
+        }
+
+        /// <summary>
+        /// Sets a native proc that can be overriden by DM code
+        /// </summary>
+        private static void SetOverridableNativeProc(IDreamObjectTree objectTree, IDreamObjectTree.TreeEntry type, NativeProc.HandlerFn func) {
+            var nativeProc = objectTree.CreateNativeProc(type.Path, func);
+
+            var proc = objectTree.World.ObjectDefinition.GetProc(nativeProc.Name);
+            if (proc.SuperProc == null) { // This proc was never overriden so just replace it
+                type.ObjectDefinition.SetProcDefinition(proc.Name, proc.Id);
+                return;
+            }
+
+            // Find the first override of the proc, we're replacing that one's super
+            while (proc.SuperProc?.SuperProc != null)
+                proc = proc.SuperProc;
+
+            proc.SuperProc = nativeProc;
         }
     }
 }

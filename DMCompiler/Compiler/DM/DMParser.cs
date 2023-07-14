@@ -4,7 +4,6 @@ using System.Linq;
 using DMCompiler.Compiler.DMPreprocessor;
 using OpenDreamShared.Compiler;
 using OpenDreamShared.Dream;
-using DereferenceType = DMCompiler.Compiler.DM.DMASTDereference.DereferenceType;
 using OpenDreamShared.Dream.Procs;
 using String = System.String;
 
@@ -33,7 +32,8 @@ namespace DMCompiler.Compiler.DM {
             TokenType.DM_RightShiftEquals,
             TokenType.DM_XorEquals,
             TokenType.DM_ModulusEquals,
-            TokenType.DM_ModulusModulusEquals
+            TokenType.DM_ModulusModulusEquals,
+            TokenType.DM_AssignInto
         };
 
         /// <remarks>This (and other similar TokenType[] sets here) is public because <see cref="DMPreprocessorParser"/> needs it.</remarks>
@@ -73,7 +73,12 @@ namespace DMCompiler.Compiler.DM {
             TokenType.DM_Period,
             TokenType.DM_Colon,
             TokenType.DM_QuestionPeriod,
-            TokenType.DM_QuestionColon
+            TokenType.DM_QuestionColon,
+            TokenType.DM_QuestionLeftBracket,
+        };
+
+        private static readonly TokenType[] WhitespacedDereferenceTypes = {
+            TokenType.DM_LeftBracket,
         };
 
         private static readonly TokenType[] WhitespaceTypes = {
@@ -105,6 +110,44 @@ namespace DMCompiler.Compiler.DM {
         private static readonly TokenType[] ForSeparatorTypes = {
             TokenType.DM_Semicolon,
             TokenType.DM_Comma
+        };
+
+        private static readonly TokenType[] OperatorOverloadTypes = {
+            TokenType.DM_And,
+            TokenType.DM_AndEquals,
+            TokenType.DM_AssignInto,
+            TokenType.DM_Bar,
+            TokenType.DM_BarEquals,
+            TokenType.DM_DoubleSquareBracket,
+            TokenType.DM_DoubleSquareBracketEquals,
+            TokenType.DM_GreaterThan,
+            TokenType.DM_GreaterThanEquals,
+            TokenType.DM_RightShift,
+            TokenType.DM_RightShiftEquals,
+            TokenType.DM_LeftShift,
+            TokenType.DM_LeftShiftEquals,
+            TokenType.DM_LessThan,
+            TokenType.DM_LessThanEquals,
+            TokenType.DM_Minus,
+            TokenType.DM_MinusEquals,
+            TokenType.DM_MinusMinus,
+            TokenType.DM_Modulus,
+            TokenType.DM_ModulusEquals,
+            TokenType.DM_ModulusModulus,
+            TokenType.DM_ModulusModulusEquals,
+            TokenType.DM_Plus,
+            TokenType.DM_PlusEquals,
+            TokenType.DM_PlusPlus,
+            TokenType.DM_Slash,
+            TokenType.DM_SlashEquals,
+            TokenType.DM_Star,
+            TokenType.DM_StarEquals,
+            TokenType.DM_StarStar,
+            TokenType.DM_Tilde,
+            TokenType.DM_TildeEquals,
+            TokenType.DM_TildeExclamation,
+            TokenType.DM_Xor,
+            TokenType.DM_XorEquals,
         };
 
         public DMASTFile File() {
@@ -170,22 +213,22 @@ namespace DMCompiler.Compiler.DM {
                 if (Check(TokenType.DM_LeftParenthesis)) {
                     DMCompiler.VerbosePrint($"Parsing proc {_currentPath}()");
                     BracketWhitespace();
-                    var parameters = DefinitionParameters();
+                    var parameters = DefinitionParameters(out var wasIndeterminate);
 
                     if (Current().Type != TokenType.DM_RightParenthesis && Current().Type != TokenType.DM_Comma &&
-                        !Check(TokenType.DM_IndeterminateArgs)) {
+                        !wasIndeterminate) {
                         if (parameters.Count > 0) // Separate error handling mentions the missing right-paren
                             Error($"error: {parameters.Last().Name}: missing comma ',' or right-paren ')'", false);
-                        parameters.AddRange(DefinitionParameters());
+                        parameters.AddRange(DefinitionParameters(out wasIndeterminate));
                     }
-                    if (!Check(TokenType.DM_IndeterminateArgs) && Current().Type != TokenType.DM_RightParenthesis && Current().Type != TokenType.EndOfFile) {
+                    if (!wasIndeterminate && Current().Type != TokenType.DM_RightParenthesis && Current().Type != TokenType.EndOfFile) {
                         // BYOND doesn't specify the arg
                         Error($"error: bad argument definition '{Current().PrintableText}'", false);
                         Advance();
                         BracketWhitespace();
                         Check(TokenType.DM_Comma);
                         BracketWhitespace();
-                        parameters.AddRange(DefinitionParameters());
+                        parameters.AddRange(DefinitionParameters(out _));
                     }
 
                     BracketWhitespace();
@@ -200,7 +243,18 @@ namespace DMCompiler.Compiler.DM {
                             procBlock = new DMASTProcBlockInner(loc, procStatement);
                         }
                     }
+                    if(path.IsOperator) {
+                        DMCompiler.UnimplementedWarning(procBlock.Location, "Operator overloads are not implemented. They will be defined but never called.");
 
+                        List<DMASTProcStatement> procStatements = procBlock.Statements.ToList();
+                        Location tokenLoc = procBlock.Location;
+                        //add ". = src" as the first expression in the operator
+                        DMASTProcStatementExpression assignEqSrc = new DMASTProcStatementExpression(tokenLoc, new DMASTAssign(tokenLoc,new DMASTCallableSelf(tokenLoc), new DMASTIdentifier(tokenLoc, "src")));
+                        procStatements.Insert(0, assignEqSrc);
+
+                        procBlock = new DMASTProcBlockInner(loc, procStatements.ToArray(), procBlock.SetStatements);
+
+                    }
                     statement = new DMASTProcDefinition(loc, _currentPath, parameters.ToArray(), procBlock);
                 }
 
@@ -307,16 +361,34 @@ namespace DMCompiler.Compiler.DM {
             string? pathElement = PathElement();
             if (pathElement != null) {
                 List<string> pathElements = new() { pathElement };
-
+                bool operatorFlag = false;
                 while (pathElement != null && Check(TokenType.DM_Slash)) {
                     pathElement = PathElement();
 
                     if (pathElement != null) {
+                        if(pathElement == "operator") {
+                            Token operatorToken = Current();
+                            if(Current().Type == TokenType.DM_Slash) {
+                                //Up to this point, it's ambiguous whether it's a slash to mean operator/(), like the division operator overload
+                                //or "operator" just being used as a normal type name, as in a/operator/b/c/d
+                                Token peekToken = Advance();
+                                if (peekToken.Type == TokenType.DM_LeftParenthesis) { // Disambiguated as an overload
+                                    operatorFlag = true;
+                                    pathElement += operatorToken.PrintableText;
+                                } else { //Otherwise it's just a normal path, resume
+                                    ReuseToken(operatorToken);
+                                    Error(WarningCode.SoftReservedKeyword, "Using \"operator\" as a path element is ambiguous");
+                                }
+                            } else if(Check(OperatorOverloadTypes)) {
+                                operatorFlag = true;
+                                pathElement+=operatorToken.PrintableText;
+                            }
+                        }
                         pathElements.Add(pathElement);
                     }
                 }
 
-                return new DMASTPath(firstToken.Location, new DreamPath(pathType, pathElements.ToArray()));
+                return new DMASTPath(firstToken.Location, new DreamPath(pathType, pathElements.ToArray()), operatorFlag);
             } else if (hasPathTypeToken) {
                 if (expression) ReuseToken(firstToken);
 
@@ -340,7 +412,7 @@ namespace DMCompiler.Compiler.DM {
         }
 
         public DMASTExpression? PathArray(ref DreamPath path) {
-            if (Current().Type == TokenType.DM_LeftBracket) {
+            if (Current().Type == TokenType.DM_LeftBracket || Current().Type == TokenType.DM_DoubleSquareBracket) {
                 var loc = Current().Location;
 
                 // Trying to use path.IsDescendantOf(DreamPath.List) here doesn't work
@@ -352,16 +424,21 @@ namespace DMCompiler.Compiler.DM {
 
                 List<DMASTCallParameter> sizes = new(2); // Most common is 1D or 2D lists
 
-                while (Check(TokenType.DM_LeftBracket)) {
-                    Whitespace();
+                while (true) {
+                    if(Check(TokenType.DM_DoubleSquareBracket))
+                        Whitespace();
+                    else if(Check(TokenType.DM_LeftBracket)) {
+                        Whitespace();
+                        var size = Expression();
+                        if (size is not null) {
+                            sizes.Add(new DMASTCallParameter(size.Location, size));
+                        }
 
-                    var size = Expression();
-                    if (size is not null) {
-                        sizes.Add(new DMASTCallParameter(size.Location, size));
+                        ConsumeRightBracket();
+                        Whitespace();
                     }
-
-                    ConsumeRightBracket();
-                    Whitespace();
+                    else
+                        break;
                 }
 
                 if (sizes.Count > 0) {
@@ -568,10 +645,10 @@ namespace DMCompiler.Compiler.DM {
                         return new DMASTProcStatementInput(loc, rightShift.A, rightShift.B);
                     case DMASTLeftShift leftShift: {
                         // A left shift on its own becomes a special "output" statement
-                        // Or something else depending on what's on the right ( browse(), browse_rsc(), or output() )
-                        if (leftShift.B is DMASTProcCall {Callable: DMASTCallableProcIdentifier identifier} procCall) {
+                        // Or something else depending on what's on the right ( browse(), browse_rsc(), output(), etc )
+                        if (leftShift.B.GetUnwrapped() is DMASTProcCall {Callable: DMASTCallableProcIdentifier identifier} procCall) {
                             switch (identifier.Identifier) {
-                                case "browse":
+                                case "browse": {
                                     if (procCall.Parameters.Length != 1 && procCall.Parameters.Length != 2)
                                         Error("browse() requires 1 or 2 parameters");
 
@@ -580,7 +657,8 @@ namespace DMCompiler.Compiler.DM {
                                         ? procCall.Parameters[1].Value
                                         : new DMASTConstantNull(loc);
                                     return new DMASTProcStatementBrowse(loc, leftShift.A, body, options);
-                                case "browse_rsc":
+                                }
+                                case "browse_rsc": {
                                     if (procCall.Parameters.Length != 1 && procCall.Parameters.Length != 2)
                                         Error("browse_rsc() requires 1 or 2 parameters");
 
@@ -589,12 +667,25 @@ namespace DMCompiler.Compiler.DM {
                                         ? procCall.Parameters[1].Value
                                         : new DMASTConstantNull(loc);
                                     return new DMASTProcStatementBrowseResource(loc, leftShift.A, file, filepath);
-                                case "output":
-                                    if (procCall.Parameters.Length != 2) Error("output() requires 2 parameters");
+                                }
+                                case "output": {
+                                    if (procCall.Parameters.Length != 2)
+                                        Error("output() requires 2 parameters");
 
                                     DMASTExpression msg = procCall.Parameters[0].Value;
                                     DMASTExpression control = procCall.Parameters[1].Value;
                                     return new DMASTProcStatementOutputControl(loc, leftShift.A, msg, control);
+                                }
+                                case "ftp": {
+                                    if (procCall.Parameters.Length is not 1 and not 2)
+                                        Error("ftp() requires 1 or 2 parameters");
+
+                                    DMASTExpression file = procCall.Parameters[0].Value;
+                                    DMASTExpression name = (procCall.Parameters.Length == 2)
+                                        ? procCall.Parameters[1].Value
+                                        : new DMASTConstantNull(loc);
+                                    return new DMASTProcStatementFtp(loc, leftShift.A, file, name);
+                                }
                             }
                         }
 
@@ -1337,6 +1428,7 @@ namespace DMCompiler.Compiler.DM {
                 }
 
                 Newline();
+                Whitespace();
                 Consume(TokenType.DM_Catch, "Expected catch");
                 Whitespace();
 
@@ -1380,12 +1472,6 @@ namespace DMCompiler.Compiler.DM {
             Newline();
 
             DMASTProcBlockInner? body = ProcBlock();
-            if (body == null) {
-                var loc = Current().Location;
-                DMASTProcStatement? statement = ProcStatement();
-
-                if (statement != null) body = new DMASTProcBlockInner(loc, statement);
-            }
 
             return new DMASTProcStatementLabel(expression.Location, expression.Identifier, body);
         }
@@ -1494,9 +1580,9 @@ namespace DMCompiler.Compiler.DM {
             }
         }
 
-        public List<DMASTDefinitionParameter> DefinitionParameters() {
+        public List<DMASTDefinitionParameter> DefinitionParameters(out bool wasIndeterminate) {
             List<DMASTDefinitionParameter> parameters = new();
-            DMASTDefinitionParameter? parameter = DefinitionParameter();
+            DMASTDefinitionParameter? parameter = DefinitionParameter(out wasIndeterminate);
 
             if (parameter != null) parameters.Add(parameter);
 
@@ -1504,7 +1590,7 @@ namespace DMCompiler.Compiler.DM {
 
             while (Check(TokenType.DM_Comma)) {
                 BracketWhitespace();
-                parameter = DefinitionParameter();
+                parameter = DefinitionParameter(out wasIndeterminate);
 
                 if (parameter != null)
                 {
@@ -1519,7 +1605,7 @@ namespace DMCompiler.Compiler.DM {
                         BracketWhitespace();
                         Check(TokenType.DM_Comma);
                         BracketWhitespace();
-                        parameters.AddRange(DefinitionParameters());
+                        parameters.AddRange(DefinitionParameters(out wasIndeterminate));
                     }
                 }
             }
@@ -1527,7 +1613,7 @@ namespace DMCompiler.Compiler.DM {
             return parameters;
         }
 
-        public DMASTDefinitionParameter? DefinitionParameter() {
+        public DMASTDefinitionParameter? DefinitionParameter(out bool wasIndeterminate) {
             DMASTPath? path = Path();
 
             if (path != null) {
@@ -1550,10 +1636,12 @@ namespace DMCompiler.Compiler.DM {
                     possibleValues = Expression();
                 }
 
+                wasIndeterminate = false;
+
                 return new DMASTDefinitionParameter(loc, path, value, type, possibleValues);
             }
 
-            Check(TokenType.DM_IndeterminateArgs);
+            wasIndeterminate = Check(TokenType.DM_IndeterminateArgs);
 
             return null;
         }
@@ -1625,6 +1713,7 @@ namespace DMCompiler.Compiler.DM {
                             case TokenType.DM_XorEquals: return new DMASTXorAssign(token.Location, expression, value);
                             case TokenType.DM_ModulusEquals: return new DMASTModulusAssign(token.Location, expression, value);
                             case TokenType.DM_ModulusModulusEquals: return new DMASTModulusModulusAssign(token.Location, expression, value);
+                            case TokenType.DM_AssignInto: return new DMASTAssignInto(token.Location, expression, value);
                         }
                     } else {
                         Error("Expected a value");
@@ -1635,61 +1724,22 @@ namespace DMCompiler.Compiler.DM {
             return expression;
         }
 
-        public DMASTExpression? ExpressionTernary() {
-            DMASTExpression a = ExpressionOr();
+        public DMASTExpression? ExpressionTernary(bool isTernaryB = false) {
+            DMASTExpression a = ExpressionOr(isTernaryB);
 
             if (a != null && Check(TokenType.DM_Question)) {
                 Whitespace();
-                DMASTExpression? b = ExpressionTernary();
+                DMASTExpression? b = ExpressionTernary(isTernaryB: true);
+                if (b is DMASTVoid) b = new DMASTConstantNull(b.Location);
                 if (b == null) Error("Expected an expression");
 
-                /* DM has some really strange behavior when it comes to proc calls and dereferences inside ternaries
-                 * Consider the following expression:
-                 *      a ? foo():pixel_x
-                 * This is ambiguous, it could be either a ternary or a dereference (and an error)
-                 *
-                 * What DM does here is parse `foo():pixel_x` as a dereference, and attempts to split it into a correct ternary
-                 * Everything past the last proc call followed by a dereference becomes "c"
-                 * This last dereference must also be a search, otherwise it's a "Expected ':'" error
-                 *
-                 * None of this happens if there is a whitespace followed by a colon after the "b" expression:
-                 *      a ? foo():pixel_x : 2
-                 */
-
-                DMASTExpression? c;
-                if (Check(TokenType.DM_Colon)) {
-                    Whitespace();
-                    c = ExpressionTernary();
-                } else {
-                    if (b is DMASTDereference deref) {
-                        c = null;
-
-                        DMASTExpression expr;
-                        DereferenceType type = default;
-                        bool conditional = default;
-                        do {
-                            if (c == null) {
-                                c = new DMASTIdentifier(deref.Location, deref.Property);
-                            } else {
-                                c = new DMASTDereference(deref.Location, new DMASTIdentifier(deref.Location, deref.Property), ((DMASTIdentifier)c).Identifier, type, conditional);
-                            }
-
-                            expr = deref.Expression;
-                            type = deref.Type;
-                            conditional = deref.Conditional;
-                            deref = expr as DMASTDereference;
-                        } while (deref != null);
-
-                        if (deref == null && type == DereferenceType.Search) {
-                            b = expr;
-                        } else {
-                            Error("Expected ':'");
-                        }
-                    } else {
-                        Error("Expected ':'");
-                        c = null;
-                    }
+                if (!Check(TokenType.DM_Colon)) {
+                    Error("Expected ':'");
                 }
+
+                Whitespace();
+                DMASTExpression? c = ExpressionTernary(isTernaryB);
+                if (c is DMASTVoid) c = new DMASTConstantNull(c.Location);
 
                 return new DMASTTernary(a.Location, a, b, c);
             }
@@ -1697,15 +1747,14 @@ namespace DMCompiler.Compiler.DM {
             return a;
         }
 
-        public DMASTExpression? ExpressionOr() {
-            DMASTExpression? a = ExpressionAnd();
-
+        public DMASTExpression? ExpressionOr(bool isTernaryB = false) {
+            DMASTExpression? a = ExpressionAnd(isTernaryB);
             if (a != null) {
                 var loc = Current().Location;
 
                 while (Check(TokenType.DM_BarBar)) {
                     Whitespace();
-                    DMASTExpression? b = ExpressionAnd();
+                    DMASTExpression? b = ExpressionAnd(isTernaryB);
                     if (b == null) Error("Expected a second value");
                     a = new DMASTOr(loc, a, b);
                 }
@@ -1714,15 +1763,15 @@ namespace DMCompiler.Compiler.DM {
             return a;
         }
 
-        public DMASTExpression? ExpressionAnd() {
-            DMASTExpression? a = ExpressionBinaryOr();
+        public DMASTExpression? ExpressionAnd(bool isTernaryB = false) {
+            DMASTExpression? a = ExpressionBinaryOr(isTernaryB);
 
             if (a != null) {
                 var loc = Current().Location;
 
                 while (Check(TokenType.DM_AndAnd)) {
                     Whitespace();
-                    DMASTExpression? b = ExpressionBinaryOr();
+                    DMASTExpression? b = ExpressionBinaryOr(isTernaryB);
                     if (b == null) Error("Expected a second value");
                     a = new DMASTAnd(loc, a, b);
                 }
@@ -1731,16 +1780,14 @@ namespace DMCompiler.Compiler.DM {
             return a;
         }
 
-        public DMASTExpression? ExpressionBinaryOr() {
-            DMASTExpression a = ExpressionBinaryXor();
-
+        public DMASTExpression? ExpressionBinaryOr(bool isTernaryB = false) {
+            DMASTExpression a = ExpressionBinaryXor(isTernaryB);
             if (a != null) {
                 var loc = Current().Location;
 
                 while (Check(TokenType.DM_Bar)) {
                     Whitespace();
-                    DMASTExpression? b = ExpressionBinaryXor();
-
+                    DMASTExpression? b = ExpressionBinaryXor(isTernaryB);
                     if (b == null) Error("Expected an expression");
                     a = new DMASTBinaryOr(loc, a, b);
                 }
@@ -1749,16 +1796,14 @@ namespace DMCompiler.Compiler.DM {
             return a;
         }
 
-        public DMASTExpression? ExpressionBinaryXor() {
-            DMASTExpression? a = ExpressionBinaryAnd();
-
+        public DMASTExpression? ExpressionBinaryXor(bool isTernaryB = false) {
+            DMASTExpression? a = ExpressionBinaryAnd(isTernaryB);
             if (a != null) {
                 var loc = Current().Location;
 
                 while (Check(TokenType.DM_Xor)) {
                     Whitespace();
-                    DMASTExpression? b = ExpressionBinaryAnd();
-
+                    DMASTExpression? b = ExpressionBinaryAnd(isTernaryB);
                     if (b == null) Error("Expected an expression");
                     a = new DMASTBinaryXor(loc, a, b);
                 }
@@ -1767,15 +1812,14 @@ namespace DMCompiler.Compiler.DM {
             return a;
         }
 
-        public DMASTExpression? ExpressionBinaryAnd() {
-            DMASTExpression? a = ExpressionComparison();
-
+        public DMASTExpression? ExpressionBinaryAnd(bool isTernaryB = false) {
+            DMASTExpression? a = ExpressionComparison(isTernaryB);
             if (a != null) {
                 var loc = Current().Location;
 
                 while (Check(TokenType.DM_And)) {
                     Whitespace();
-                    DMASTExpression? b = ExpressionComparison();
+                    DMASTExpression? b = ExpressionComparison(isTernaryB);
 
                     if (b == null) Error("Expected an expression");
                     a = new DMASTBinaryAnd(loc, a, b);
@@ -1785,15 +1829,15 @@ namespace DMCompiler.Compiler.DM {
             return a;
         }
 
-        public DMASTExpression? ExpressionComparison() {
-            DMASTExpression? a = ExpressionBitShift();
+        public DMASTExpression? ExpressionComparison(bool isTernaryB = false) {
+            DMASTExpression? a = ExpressionBitShift(isTernaryB);
 
             if (a != null) {
                 Token token = Current();
 
                 while (Check(ComparisonTypes)) {
                     Whitespace();
-                    DMASTExpression? b = ExpressionBitShift();
+                    DMASTExpression? b = ExpressionBitShift(isTernaryB);
                     if (b == null) Error("Expected an expression to compare to");
 
                     switch (token.Type) {
@@ -1810,15 +1854,15 @@ namespace DMCompiler.Compiler.DM {
             return a;
         }
 
-        public DMASTExpression? ExpressionBitShift() {
-            DMASTExpression? a = ExpressionComparisonLtGt();
+        public DMASTExpression? ExpressionBitShift(bool isTernaryB = false) {
+            DMASTExpression? a = ExpressionComparisonLtGt(isTernaryB);
 
             if (a != null) {
                 Token token = Current();
 
                 while (Check(ShiftTypes)) {
                     Whitespace();
-                    DMASTExpression? b = ExpressionComparisonLtGt();
+                    DMASTExpression? b = ExpressionComparisonLtGt(isTernaryB);
                     if (b == null) Error("Expected an expression");
 
                     switch (token.Type) {
@@ -1833,15 +1877,15 @@ namespace DMCompiler.Compiler.DM {
             return a;
         }
 
-        public DMASTExpression? ExpressionComparisonLtGt() {
-            DMASTExpression? a = ExpressionAdditionSubtraction();
+        public DMASTExpression? ExpressionComparisonLtGt(bool isTernaryB = false) {
+            DMASTExpression? a = ExpressionAdditionSubtraction(isTernaryB);
 
             if (a != null) {
                 Token token = Current();
 
                 while (Check(LtGtComparisonTypes)) {
                     Whitespace();
-                    DMASTExpression? b = ExpressionAdditionSubtraction();
+                    DMASTExpression? b = ExpressionAdditionSubtraction(isTernaryB);
                     if (b == null) Error("Expected an expression");
 
                     switch (token.Type) {
@@ -1858,15 +1902,15 @@ namespace DMCompiler.Compiler.DM {
             return a;
         }
 
-        public DMASTExpression? ExpressionAdditionSubtraction() {
-            DMASTExpression? a = ExpressionMultiplicationDivisionModulus();
+        public DMASTExpression? ExpressionAdditionSubtraction(bool isTernaryB = false) {
+            DMASTExpression? a = ExpressionMultiplicationDivisionModulus(isTernaryB);
 
             if (a != null) {
                 Token token = Current();
 
                 while (Check(PlusMinusTypes)) {
                     Whitespace();
-                    DMASTExpression? b = ExpressionMultiplicationDivisionModulus();
+                    DMASTExpression? b = ExpressionMultiplicationDivisionModulus(isTernaryB);
                     if (b == null) Error("Expected an expression");
 
                     switch (token.Type) {
@@ -1881,15 +1925,15 @@ namespace DMCompiler.Compiler.DM {
             return a;
         }
 
-        public DMASTExpression? ExpressionMultiplicationDivisionModulus() {
-            DMASTExpression? a = ExpressionPower();
+        public DMASTExpression? ExpressionMultiplicationDivisionModulus(bool isTernaryB = false) {
+            DMASTExpression? a = ExpressionPower(isTernaryB);
 
             if (a != null) {
                 Token token = Current();
 
                 while (Check(MulDivModTypes)) {
                     Whitespace();
-                    DMASTExpression? b = ExpressionPower();
+                    DMASTExpression? b = ExpressionPower(isTernaryB);
                     if (b == null) Error("Expected an expression");
 
                     switch (token.Type) {
@@ -1906,16 +1950,15 @@ namespace DMCompiler.Compiler.DM {
             return a;
         }
 
-        public DMASTExpression? ExpressionPower() {
-            DMASTExpression? a = ExpressionUnary();
+        public DMASTExpression? ExpressionPower(bool isTernaryB = false) {
+            DMASTExpression? a = ExpressionUnary(isTernaryB);
 
             if (a != null) {
                 var loc = Current().Location;
 
                 while (Check(TokenType.DM_StarStar)) {
                     Whitespace();
-                    DMASTExpression? b = ExpressionPower();
-
+                    DMASTExpression? b = ExpressionPower(isTernaryB);
                     if (b == null) Error("Expected an expression");
                     a = new DMASTPower(loc, a, b);
                 }
@@ -1924,35 +1967,35 @@ namespace DMCompiler.Compiler.DM {
             return a;
         }
 
-        public DMASTExpression? ExpressionUnary() {
+        public DMASTExpression? ExpressionUnary(bool isTernaryB = false) {
             var loc = Current().Location;
 
             if (Check(TokenType.DM_Exclamation)) {
                 Whitespace();
-                DMASTExpression? expression = ExpressionUnary();
+                DMASTExpression? expression = ExpressionUnary(isTernaryB);
                 if (expression == null) Error("Expected an expression");
 
                 return new DMASTNot(loc, expression);
             } else if (Check(TokenType.DM_Tilde)) {
                 Whitespace();
-                DMASTExpression? expression = ExpressionUnary();
+                DMASTExpression? expression = ExpressionUnary(isTernaryB);
                 if (expression == null) Error("Expected an expression");
 
                 return new DMASTBinaryNot(loc, expression);
             } else if (Check(TokenType.DM_PlusPlus)) {
                 Whitespace();
-                DMASTExpression? expression = ExpressionSign();
+                DMASTExpression? expression = ExpressionSign(isTernaryB);
                 if (expression == null) Error("Expected an expression");
 
                 return new DMASTPreIncrement(loc, expression);
             } else if (Check(TokenType.DM_MinusMinus)) {
                 Whitespace();
-                DMASTExpression? expression = ExpressionSign();
+                DMASTExpression? expression = ExpressionSign(isTernaryB);
                 if (expression == null) Error("Expected an expression");
 
                 return new DMASTPreDecrement(loc, expression);
             } else {
-                DMASTExpression expression = ExpressionSign();
+                DMASTExpression expression = ExpressionSign(isTernaryB);
 
                 if (expression != null) {
                     if (Check(TokenType.DM_PlusPlus)) {
@@ -1968,7 +2011,7 @@ namespace DMCompiler.Compiler.DM {
             }
         }
 
-        public DMASTExpression? ExpressionSign() {
+        public DMASTExpression? ExpressionSign(bool isTernaryB = false) {
             Token token = Current();
 
             if (Check(PlusMinusTypes)) {
@@ -1990,10 +2033,10 @@ namespace DMCompiler.Compiler.DM {
                 }
             }
 
-            return ExpressionNew();
+            return ExpressionNew(isTernaryB);
         }
 
-        public DMASTExpression? ExpressionNew() {
+        public DMASTExpression? ExpressionNew(bool isTernaryB = false) {
             var loc = Current().Location;
 
             if (Check(TokenType.DM_New)) {
@@ -2002,40 +2045,38 @@ namespace DMCompiler.Compiler.DM {
                 type = ParseDereference(type, allowCalls: false);
                 DMASTCallParameter[]? parameters = ProcCall();
 
-                //TODO: These don't need to be separate types
                 DMASTExpression? newExpression = type switch {
-                    DMASTListIndex listIdx => new DMASTNewListIndex(loc, listIdx, parameters),
-                    DMASTDereference deref => new DMASTNewDereference(loc, deref, parameters),
-                    DMASTIdentifier identifier => new DMASTNewIdentifier(loc, identifier, parameters),
                     DMASTConstantPath path => new DMASTNewPath(loc, path.Value, parameters),
+                    DMASTExpression expr => new DMASTNewExpr(loc, expr, parameters),
                     null => new DMASTNewInferred(loc, parameters),
-                    _ => null
                 };
 
-                if (newExpression == null) Error("Invalid type");
                 newExpression = ParseDereference(newExpression);
                 return newExpression;
             }
 
-            return ParseDereference(ExpressionPrimary());
+            return ParseDereference(ExpressionPrimary(), true, isTernaryB);
         }
 
         public DMASTExpression? ExpressionPrimary(bool allowParentheses = true) {
+            var token = Current();
             if (allowParentheses && Check(TokenType.DM_LeftParenthesis)) {
                 BracketWhitespace();
                 DMASTExpression? inner = Expression();
                 BracketWhitespace();
                 ConsumeRightParenthesis();
 
-                if (inner is DMASTIdentifier identifier) {
-                    inner = new DMASTIdentifierWrapped(identifier.Location, identifier);
+                if (inner is null) {
+                    inner = new DMASTVoid(token.Location);
+                } else {
+                    inner = new DMASTExpressionWrapped(inner.Location, inner);
                 }
 
                 return inner;
             }
 
-            var loc = Current().Location;
-            if (Current().Type == TokenType.DM_Var && _allowVarDeclExpression) {
+            var loc = token.Location;
+            if (token.Type == TokenType.DM_Var && _allowVarDeclExpression) {
                 return new DMASTVarDeclExpression( loc, Path() );
             }
 
@@ -2130,78 +2171,162 @@ namespace DMCompiler.Compiler.DM {
             Whitespace();
         }
 
-        private DMASTExpression? ParseDereference(DMASTExpression? expression, bool allowCalls = true) {
+        private DMASTExpression? ParseDereference(DMASTExpression? expression, bool allowCalls = true, bool isTernaryB = false) {
+            // We don't compile expression-calls as dereferences, but they have very similar precedence
+            if (allowCalls) {
+                expression = ParseProcCall(expression);
+            }
+
             if (expression != null) {
+                List<DMASTDereference.Operation> operations = new();
+                bool ternaryBHasPriority = expression is not DMASTIdentifier;
+
                 while (true) {
                     Token token = Current();
 
-                    if (Check(DereferenceTypes)) {
-                        bool invalidDeref = (expression is DMASTExpressionConstant && token.Type == TokenType.DM_Colon);
-                        DMASTIdentifier? property = null;
-                        if (!invalidDeref) {
-                            property = Identifier();
-                            if (property == null) {
-                                if (token.Type == TokenType.DM_Colon) {
-                                    invalidDeref = true;
-                                } else {
-                                    Error("Expected an identifier to dereference");
-                                }
+                    // Check for a valid deref operation token
+                    {
+                        if (!Check(DereferenceTypes)) {
+                            Whitespace();
+
+                            token = Current();
+
+                            if (!Check(WhitespacedDereferenceTypes)) {
+                                break;
+                            }
+                        }
+                    }
+
+                    // Cancel this operation chain (and potentially fall back to ternary behaviour) if this looks more like part of a ternary expression than a deref
+                    if (token.Type == TokenType.DM_Colon) {
+                        bool invalidDereference = (expression is DMASTExpressionConstant);
+
+                        if (!invalidDereference) {
+                            Token innerToken = Current();
+
+                            if (Check(IdentifierTypes)) {
+                                ReuseToken(innerToken);
+                            } else {
+                                invalidDereference = true;
                             }
                         }
 
-                        if (invalidDeref) {
-                            //Not a valid dereference, but could still be a part of a ternary, so abort
+                        if (invalidDereference) {
                             ReuseToken(token);
                             break;
                         }
+                    }
 
-                        (DereferenceType type, bool conditional) = token.Type switch {
-                            TokenType.DM_Period => (DereferenceType.Direct, false),
-                            TokenType.DM_QuestionPeriod => (DereferenceType.Direct, true),
-                            TokenType.DM_QuestionColon => (DereferenceType.Search, true),
-                            TokenType.DM_Colon => (DereferenceType.Search, false),
-                            _ => throw new InvalidOperationException($"Invalid dereference token {token}")
-                        };
-
-                        if (expression is DMASTIdentifier ident && ident.Identifier == "global" && conditional == false) { // global.x
-                            expression = new DMASTGlobalIdentifier(expression.Location, property.Identifier);
-                        } else {
-                            expression = new DMASTDereference(expression.Location, expression, property.Identifier, type, conditional);
-                        }
-                    } else {
+                    // `:` token should preemptively end our dereference when inside the `b` operand of a ternary
+                    // but not for the first dereference if the base expression is an identifier!
+                    if (isTernaryB && ternaryBHasPriority && token.Type == TokenType.DM_Colon) {
+                        ReuseToken(token);
                         break;
                     }
-                }
 
-                if (allowCalls) {
-                    DMASTExpression procCall = ParseProcCall(expression);
+                    DMASTDereference.Operation operation = new() {
+                        Kind = DMASTDereference.OperationKind.Invalid,
+                    };
 
-                    if (procCall != expression) { //Successfully parsed a proc call
-                        expression = procCall;
-                        expression = ParseDereference(expression);
+                    switch (token.Type) {
+                        case TokenType.DM_Period:
+                        case TokenType.DM_QuestionPeriod:
+                        case TokenType.DM_Colon:
+                        case TokenType.DM_QuestionColon: {
+                                DMASTIdentifier identifier = Identifier();
+
+                                operation.Kind = token.Type switch {
+                                    TokenType.DM_Period => DMASTDereference.OperationKind.Field,
+                                    TokenType.DM_QuestionPeriod => DMASTDereference.OperationKind.FieldSafe,
+                                    TokenType.DM_Colon => DMASTDereference.OperationKind.FieldSearch,
+                                    TokenType.DM_QuestionColon => DMASTDereference.OperationKind.FieldSafeSearch,
+                                    _ => throw new InvalidOperationException(),
+                                };
+
+                                operation.Identifier = identifier;
+                            }
+                            break;
+
+                        case TokenType.DM_LeftBracket:
+                        case TokenType.DM_QuestionLeftBracket: {
+                                ternaryBHasPriority = true;
+
+                                Whitespace();
+                                DMASTExpression index = Expression();
+                                ConsumeRightBracket();
+
+                                operation.Kind = token.Type switch {
+                                    TokenType.DM_LeftBracket => DMASTDereference.OperationKind.Index,
+                                    TokenType.DM_QuestionLeftBracket => DMASTDereference.OperationKind.IndexSafe,
+                                    _ => throw new InvalidOperationException(),
+                                };
+
+                                operation.Index = index;
+                            }
+                            break;
+
+                        default:
+                            throw new InvalidOperationException("unhandled dereference token");
                     }
+
+                    // Attempt to upgrade this operation to a call
+                    if (allowCalls) {
+                        Whitespace();
+
+                        DMASTCallParameter[] parameters = ProcCall();
+
+                        if (parameters != null) {
+                            ternaryBHasPriority = true;
+
+                            switch (operation.Kind) {
+                                case DMASTDereference.OperationKind.Field:
+                                    operation.Kind = DMASTDereference.OperationKind.Call;
+                                    operation.Parameters = parameters;
+                                    break;
+
+                                case DMASTDereference.OperationKind.FieldSafe:
+                                    operation.Kind = DMASTDereference.OperationKind.CallSafe;
+                                    operation.Parameters = parameters;
+                                    break;
+
+                                case DMASTDereference.OperationKind.FieldSearch:
+                                    operation.Kind = DMASTDereference.OperationKind.CallSearch;
+                                    operation.Parameters = parameters;
+                                    break;
+
+                                case DMASTDereference.OperationKind.FieldSafeSearch:
+                                    operation.Kind = DMASTDereference.OperationKind.CallSafeSearch;
+                                    operation.Parameters = parameters;
+                                    break;
+
+                                case DMASTDereference.OperationKind.Index:
+                                case DMASTDereference.OperationKind.IndexSafe:
+                                    Error("attempt to call an invalid l-value");
+                                    return null;
+
+                                case DMASTDereference.OperationKind.Call:
+                                case DMASTDereference.OperationKind.CallSafe:
+                                default:
+                                    throw new InvalidOperationException("unhandled dereference operation kind");
+                            }
+                        }
+                    }
+
+                    operations.Add(operation);
                 }
 
-                Whitespace();
-                Token indexToken = Current();
-                if (Check(TokenType.DM_LeftBracket) || Check(TokenType.DM_QuestionLeftBracket)) {
-                    bool conditional = indexToken.Type == TokenType.DM_QuestionLeftBracket;
-
+                if (operations.Any()) {
                     Whitespace();
-                    DMASTExpression? index = Expression();
-                    ConsumeRightBracket();
-
-                    expression = new DMASTListIndex(expression.Location, expression, index, conditional);
-                    expression = ParseDereference(expression);
-                    Whitespace();
+                    return new DMASTDereference(expression.Location, expression, operations.ToArray());
                 }
             }
 
+            Whitespace();
             return expression;
         }
 
         private DMASTExpression ParseProcCall(DMASTExpression expression) {
-            if (expression is not (DMASTCallable or DMASTIdentifier or DMASTDereference or DMASTGlobalIdentifier)) return expression;
+            if (expression is not (DMASTCallable or DMASTIdentifier or DMASTGlobalIdentifier)) return expression;
 
             Whitespace();
 
@@ -2220,9 +2345,6 @@ namespace DMCompiler.Compiler.DM {
                 if (expression is DMASTGlobalIdentifier gid) {
                     var globalProc = new DMASTCallableGlobalProc(expression.Location, gid.Identifier);
                     return new DMASTProcCall(gid.Location, globalProc, callParameters);
-                } else if (expression is DMASTDereference deref) {
-                    DMASTDereferenceProc derefProc = new DMASTDereferenceProc(deref.Location, deref.Expression, deref.Property, deref.Type, deref.Conditional);
-                    return new DMASTProcCall(expression.Location, derefProc, callParameters);
                 } else if (expression is DMASTCallable callable) {
                     return new DMASTProcCall(expression.Location, callable, callParameters);
                 }

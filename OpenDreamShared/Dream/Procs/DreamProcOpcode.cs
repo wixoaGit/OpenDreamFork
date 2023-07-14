@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
 using System.Text;
 
 namespace OpenDreamShared.Dream.Procs {
@@ -74,7 +75,7 @@ namespace OpenDreamShared.Dream.Procs {
         DebugSource = 0x43,
         DebugLine = 0x44,
         Prompt = 0x45,
-        //0x46
+        Ftp = 0x46,
         Initial = 0x47,
         //0x48
         IsType = 0x49,
@@ -104,12 +105,23 @@ namespace OpenDreamShared.Dream.Procs {
         ModulusModulusReference = 0x61,
         PushProcStub = 0x62,
         PushVerbStub = 0x63,
-        BitShiftLeftReference = 0x64,
-        BitShiftRightReference = 0x65,
-        Try = 0x66,
-        TryNoValue = 0x67,
-        EndTry = 0x68,
-        Gradient = 0x69
+        JumpIfNull = 0x64,
+        JumpIfNullNoPop = 0x65,
+        JumpIfTrueReference = 0x66,
+        JumpIfFalseReference = 0x67,
+        DereferenceField = 0x68,
+        DereferenceIndex = 0x69,
+        DereferenceCall = 0x6A,
+        PopReference = 0x6B,
+        //0x6C
+        BitShiftLeftReference = 0x6D,
+        BitShiftRightReference = 0x6E,
+        Try = 0x6F,
+        TryNoValue = 0x70,
+        EndTry = 0x71,
+        EnumerateNoAssign = 0x72,
+        Gradient = 0x73,
+        AssignInto = 0x74,
     }
 
     /// <summary>
@@ -159,6 +171,9 @@ namespace OpenDreamShared.Dream.Procs {
 
             Proper,                   //String represents a proper noun
             Improper,                 //String represents an improper noun
+
+            LowerRoman,               //i, ii, iii, iv, v
+            UpperRoman,               //I, II, III, IV, V
 
             OrdinalIndicator,        //1st, 2nd, 3rd, 4th, ...
             PluralSuffix,            //-s suffix at the end of a plural noun
@@ -284,7 +299,6 @@ namespace OpenDreamShared.Dream.Procs {
             Global,
             Field,
             SrcField,
-            Proc,
             GlobalProc,
             SrcProc,
             SuperProc
@@ -298,38 +312,41 @@ namespace OpenDreamShared.Dream.Procs {
         //Field, SrcField, Proc, SrcProc
         public string Name;
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static DMReference CreateArgument(int argId) {
             if (argId > 255) throw new Exception("Argument id is greater than the maximum of 255");
 
             return new DMReference() { RefType = Type.Argument, Index = (byte)argId };
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static DMReference CreateLocal(int local) {
             if (local > 255) throw new Exception("Local variable id is greater than the maximum of 255");
 
             return new DMReference() { RefType = Type.Local, Index = (byte)local };
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static DMReference CreateGlobal(int global) {
             return new DMReference() { RefType = Type.Global, Index = global };
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static DMReference CreateField(string fieldName) {
             return new DMReference() { RefType = Type.Field, Name = fieldName };
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static DMReference CreateSrcField(string fieldName) {
             return new DMReference() { RefType = Type.SrcField, Name = fieldName };
         }
 
-        public static DMReference CreateProc(string procName) {
-            return new DMReference() { RefType = Type.Proc, Name = procName };
-        }
-
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static DMReference CreateGlobalProc(int procId) {
             return new DMReference() { RefType = Type.GlobalProc, Index = procId };
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static DMReference CreateSrcProc(string procName) {
             return new DMReference() { RefType = Type.SrcProc, Name = procName };
         }
@@ -345,7 +362,6 @@ namespace OpenDreamShared.Dream.Procs {
                 case Type.SrcField:
                 case Type.Field:
                 case Type.SrcProc:
-                case Type.Proc:
                     return $"{RefType} \"{Name}\"";
 
                 default: return RefType.ToString();

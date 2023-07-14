@@ -69,7 +69,7 @@ namespace OpenDreamRuntime.Procs {
             }
 
             public Task<DreamValue> CallNoWait(DreamProc proc, DreamObject src, DreamObject? usr, params DreamValue[] arguments) {
-                _callTcs = new();
+                _callTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
                 _callProcNotify = proc.CreateState(Thread, src, usr, new DreamProcArguments(arguments));
                 _callProcNotify.WaitFor = false;
 
@@ -196,8 +196,8 @@ namespace OpenDreamRuntime.Procs {
 
         private readonly nuint _locationId;
 
-        public AsyncNativeProc(DreamPath owningType, string name, List<String> argumentNames, Dictionary<string, DreamValue> defaultArgumentValues, Func<State, Task<DreamValue>> taskFunc, IDreamManager dreamManager, DreamResourceManager resourceManager, IDreamObjectTree objectTree)
-            : base(owningType, name, null, ProcAttributes.None, argumentNames, null, null, null, null, null) {
+        public AsyncNativeProc(int id, DreamPath owningType, string name, List<String> argumentNames, Dictionary<string, DreamValue> defaultArgumentValues, Func<State, Task<DreamValue>> taskFunc, IDreamManager dreamManager, DreamResourceManager resourceManager, IDreamObjectTree objectTree)
+            : base(id, owningType, name, null, ProcAttributes.None, argumentNames, null, null, null, null, null) {
             _defaultArgumentValues = defaultArgumentValues;
             _taskFunc = taskFunc;
             _locationId = ProfilerInternal.CreateLocation(name, "NativeProcs.cs", 0);

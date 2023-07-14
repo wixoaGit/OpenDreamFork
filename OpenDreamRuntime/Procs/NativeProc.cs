@@ -24,9 +24,16 @@ namespace OpenDreamRuntime.Procs {
 
                 argumentNames.Add(parameterAttribute.Name);
                 if (parameterAttribute.DefaultValue != default) {
-                    if (defaultArgumentValues == null) defaultArgumentValues = new Dictionary<string, DreamValue>();
+                    defaultArgumentValues ??= new Dictionary<string, DreamValue>(1);
+                    DreamValue defaultValue = parameterAttribute.DefaultValue switch {
+                        // These are the only types you should be able to set in an attribute
+                        int intValue => new(intValue),
+                        float floatValue => new(floatValue),
+                        string stringValue => new(stringValue),
+                        _ => throw new Exception($"Invalid default value {parameterAttribute.DefaultValue}")
+                    };
 
-                    defaultArgumentValues.Add(parameterAttribute.Name, new DreamValue(parameterAttribute.DefaultValue));
+                    defaultArgumentValues.Add(parameterAttribute.Name, defaultValue);
                 }
             }
 
@@ -36,7 +43,7 @@ namespace OpenDreamRuntime.Procs {
         public sealed class State : ProcState {
             public static readonly Stack<State> Pool = new();
 
-            public DreamObject? Src;
+            public DreamObject? Src; // TODO: Maybe make this a generic so Src doesn't have to be casted
             public DreamObject? Usr;
 
             public DreamProcArguments Arguments => new(_arguments.AsSpan(0, _argumentCount));
@@ -105,8 +112,8 @@ namespace OpenDreamRuntime.Procs {
 
         private readonly nuint _locationId;
 
-        public NativeProc(DreamPath owningType, string name, List<String> argumentNames, Dictionary<string, DreamValue> defaultArgumentValues, HandlerFn handler, IDreamManager dreamManager, IAtomManager atomManager, IDreamMapManager mapManager, DreamResourceManager resourceManager, IDreamObjectTree objectTree)
-            : base(owningType, name, null, ProcAttributes.None, argumentNames, null, null, null, null, null) {
+        public NativeProc(int id, DreamPath owningType, string name, List<string> argumentNames, Dictionary<string, DreamValue> defaultArgumentValues, HandlerFn handler, IDreamManager dreamManager, IAtomManager atomManager, IDreamMapManager mapManager, DreamResourceManager resourceManager, IDreamObjectTree objectTree)
+            : base(id, owningType, name, null, ProcAttributes.None, argumentNames, null, null, null, null, null) {
             _defaultArgumentValues = defaultArgumentValues;
             _handler = handler;
 
