@@ -151,6 +151,8 @@ namespace DMCompiler.DM {
             procDefinition.OwningTypeId = _dmObject.Id;
             procDefinition.Name = Name;
             procDefinition.IsVerb = IsVerb;
+            procDefinition.SourceLocation = new SourceInfoJson
+                {Offset = 0, File = DMObjectTree.AddString(Location.SourceFile ?? "unknown"), Line = Location.Line ?? -1};
             procDefinition.SourceInfo = _sourceInfo;
 
             if ((Attributes & ProcAttributes.None) != ProcAttributes.None) {

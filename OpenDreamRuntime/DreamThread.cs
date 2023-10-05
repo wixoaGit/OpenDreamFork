@@ -222,7 +222,7 @@ namespace OpenDreamRuntime {
                     ProcStatus status;
                     try {
                         // _current.Resume may mutate our state!!!
-                        if (!_current.TracyZoned) {
+                        if (!_current.TracyZoned && _current.Proc != null) {
                             _current.TracyZoneId = ProfilerInternal.StartScopedZone(_current.TracyLocationId);
                             _current.TracyZoned = true;
                         }

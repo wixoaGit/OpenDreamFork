@@ -59,8 +59,6 @@ public sealed unsafe class NativeProc : DreamProc {
         public DreamResourceManager ResourceManager => Proc._resourceManager;
         public DreamObjectTree ObjectTree => Proc._objectTree;
 
-        public override nuint TracyLocationId => Proc._locationId;
-
         public Bundle(NativeProc proc, DreamProcArguments arguments) {
             Proc = proc;
             Arguments = arguments.Values;

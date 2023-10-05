@@ -48,7 +48,8 @@ namespace OpenDreamRuntime.Procs {
             ObjectTree = objectTree;
             ProcScheduler = procScheduler;
 
-            LocationId = ProfilerInternal.CreateLocation(ToString(), Source, (uint)Line);
+            string sourceFile = ObjectTree.Strings[json.SourceLocation.File!.Value];
+            LocationId = ProfilerInternal.CreateLocation(ToString(), sourceFile, (uint)json.SourceLocation.Line);
         }
 
         public (string Source, int Line) GetSourceAtOffset(int offset) {
@@ -153,7 +154,9 @@ namespace OpenDreamRuntime.Procs {
 
         public override DreamProc? Proc => _proc;
 
-        private DreamProc? _proc;
+        public override UIntPtr TracyLocationId => _proc.LocationId;
+
+        private DMProc? _proc;
 
         public override ProcStatus Resume() {
             return ProcStatus.Returned; // do nothing heehoo
