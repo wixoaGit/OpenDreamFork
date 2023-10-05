@@ -2,8 +2,8 @@
 using OpenDreamShared.Json;
 using System;
 using System.Collections.Generic;
+using DMCompiler.Bytecode;
 using OpenDreamShared.Compiler;
-using OpenDreamShared.Dream.Procs;
 
 namespace DMCompiler.DM {
     /// <remarks>
@@ -21,6 +21,8 @@ namespace DMCompiler.DM {
         public Dictionary<string, DMVariable> VariableOverrides = new();
         public Dictionary<string, int> GlobalVariables = new();
         /// <summary>A list of var and verb initializations implicitly done before the user's New() is called.</summary>
+        public HashSet<string> ConstVariables = new();
+        public HashSet<string> TmpVariables = new();
         public List<DMExpression> InitializationProcExpressions = new();
         public int? InitializationProc;
 
@@ -85,26 +87,8 @@ namespace DMCompiler.DM {
             return Parent?.HasProc(name) ?? false;
         }
 
-        public bool HasProcNoInheritence(string name) {
+        public bool HasProcNoInheritance(string name) {
             return Procs.ContainsKey(name);
-        }
-
-        /// <summary>
-        /// Slightly more nuanced than HasProc, makes sure that one of the DMProcs we have in this hierarchy is the original definition.
-        /// </summary>
-        /// <returns>True if we could find a definition, false if not.</returns>
-        public bool HasProcDefined(string name) {
-            if(Procs.TryGetValue(name, out var IDList)) {
-                // You'd expect us to be able to just index into the first entry,
-                // but, no, it can seriously be in {override, override, definition, override} order
-                foreach (int ID in IDList) {
-                    DMProc proc = DMObjectTree.AllProcs[ID];
-                    if((proc.Attributes & ProcAttributes.IsOverride) != ProcAttributes.IsOverride) {
-                        return true;
-                    }
-                }
-            }
-            return Parent?.HasProcDefined(name) ?? false;
         }
 
         public List<int>? GetProcs(string name) {
@@ -147,18 +131,9 @@ namespace DMCompiler.DM {
                 InitializationProc = init.Id;
                 init.Call(DMReference.SuperProc, DMCallArgumentsType.None, 0);
 
-                string? lastSource = null;
                 foreach (DMExpression expression in InitializationProcExpressions) {
                     try {
-                        if (expression.Location.Line is int line) {
-                            // Only emit DebugSource when source changes
-                            if (expression.Location.SourceFile != lastSource) {
-                                init.DebugSource(expression.Location.SourceFile);
-                                lastSource = expression.Location.SourceFile;
-                            }
-
-                            init.DebugLine(line);
-                        }
+                        init.DebugSource(expression.Location);
 
                         expression.EmitPushValue(this, init);
                     } catch (CompileErrorException e) {
@@ -194,6 +169,14 @@ namespace DMCompiler.DM {
 
             if (GlobalVariables.Count > 0) {
                 typeJson.GlobalVariables = GlobalVariables;
+            }
+
+            if (ConstVariables.Count > 0) {
+                typeJson.ConstVariables = ConstVariables;
+            }
+
+            if (TmpVariables.Count > 0) {
+                typeJson.TmpVariables = TmpVariables;
             }
 
             if (InitializationProc != null) {

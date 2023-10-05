@@ -97,6 +97,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PER.Tracy", "PER.Tracy\PER.
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenDreamPackaging", "OpenDreamPackaging\OpenDreamPackaging.csproj", "{A86753A5-C9D8-4F3E-B030-BCFC64DF35D6}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Robust.Serialization.Generator", "RobustToolbox\Robust.Serialization.Generator\Robust.Serialization.Generator.csproj", "{366AA569-0889-491B-AB00-F038EAEC5221}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -424,6 +426,16 @@ Global
 		{F88BA54F-9ADC-483A-91D5-48010E1AE006}.Release|Any CPU.Build.0 = Release|Any CPU
 		{F88BA54F-9ADC-483A-91D5-48010E1AE006}.Release|x64.ActiveCfg = Release|Any CPU
 		{F88BA54F-9ADC-483A-91D5-48010E1AE006}.Release|x64.Build.0 = Release|Any CPU
+		{366AA569-0889-491B-AB00-F038EAEC5221}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{366AA569-0889-491B-AB00-F038EAEC5221}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{366AA569-0889-491B-AB00-F038EAEC5221}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{366AA569-0889-491B-AB00-F038EAEC5221}.Debug|x64.Build.0 = Debug|Any CPU
+		{366AA569-0889-491B-AB00-F038EAEC5221}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{366AA569-0889-491B-AB00-F038EAEC5221}.Release|Any CPU.Build.0 = Release|Any CPU
+		{366AA569-0889-491B-AB00-F038EAEC5221}.Release|x64.ActiveCfg = Release|Any CPU
+		{366AA569-0889-491B-AB00-F038EAEC5221}.Release|x64.Build.0 = Release|Any CPU
+		{366AA569-0889-491B-AB00-F038EAEC5221}.Tools|Any CPU.ActiveCfg = Debug|Any CPU
+		{366AA569-0889-491B-AB00-F038EAEC5221}.Tools|Any CPU.Build.0 = Debug|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

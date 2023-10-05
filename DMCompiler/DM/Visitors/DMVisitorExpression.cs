@@ -3,18 +3,27 @@ using DMCompiler.DM.Expressions;
 using OpenDreamShared.Compiler;
 using DMCompiler.Compiler.DM;
 using OpenDreamShared.Dream;
-using OpenDreamShared.Dream.Procs;
 using Robust.Shared.Utility;
 
 namespace DMCompiler.DM.Visitors {
-    sealed class DMVisitorExpression : DMASTVisitor {
+    internal sealed class DMVisitorExpression : DMASTVisitor {
+        public enum ScopeMode {
+            // All in-scope procs and vars available
+            Normal,
+
+            // Only global vars and procs available
+            Static,
+
+            // Only global procs available
+            FirstPassStatic
+        }
+
+        public static ScopeMode CurrentScopeMode = ScopeMode.Normal;
+        public DMExpression Result { get; private set; }
+
         private readonly DMObject _dmObject;
         private readonly DMProc _proc;
         private readonly DreamPath? _inferredPath;
-        internal DMExpression Result { get; private set; }
-
-        // NOTE This needs to be turned into a Stack of modes if more complicated scope changes are added in the future
-        public static string _scopeMode = "normal";
 
         internal DMVisitorExpression(DMObject dmObject, DMProc proc, DreamPath? inferredPath) {
             _dmObject = dmObject;
@@ -107,28 +116,29 @@ namespace DMCompiler.DM.Visitors {
                     Result = new Expressions.Global(identifier.Location);
                     break;
                 default: {
-                    DMProc.LocalVariable localVar = _proc?.GetLocalVariable(name);
-                    if (localVar != null && _scopeMode == "normal") {
-                        Result = new Expressions.Local(identifier.Location, localVar);
-                        return;
+                    if (CurrentScopeMode == ScopeMode.Normal) {
+                        DMProc.LocalVariable localVar = _proc?.GetLocalVariable(name);
+                        if (localVar != null) {
+                            Result = new Expressions.Local(identifier.Location, localVar);
+                            return;
+                        }
+
+                        var field = _dmObject?.GetVariable(name);
+                        if (field != null) {
+                            Result = new Expressions.Field(identifier.Location, field);
+                            return;
+                        }
                     }
 
-                    int? procGlobalId = _proc?.GetGlobalVariableId(name);
-                    if (procGlobalId != null) {
-                        Result = new Expressions.GlobalField(identifier.Location, DMObjectTree.Globals[procGlobalId.Value].Type, procGlobalId.Value);
-                        return;
-                    }
+                    if (CurrentScopeMode != ScopeMode.FirstPassStatic) {
+                        int? globalId = _proc?.GetGlobalVariableId(name) ?? _dmObject?.GetGlobalVariableId(name);
 
-                    var field = _dmObject?.GetVariable(name);
-                    if (field != null && _scopeMode == "normal") {
-                        Result = new Expressions.Field(identifier.Location, field);
-                        return;
-                    }
+                        if (globalId != null) {
+                            var global = new Expressions.GlobalField(identifier.Location, DMObjectTree.Globals[globalId.Value].Type, globalId.Value);
 
-                    int? globalId = _dmObject?.GetGlobalVariableId(name);
-                    if (globalId != null) {
-                        Result = new Expressions.GlobalField(identifier.Location, DMObjectTree.Globals[globalId.Value].Type, globalId.Value);
-                        return;
+                            Result = global;
+                            return;
+                        }
                     }
 
                     throw new UnknownIdentifierException(identifier.Location, name);
@@ -143,14 +153,16 @@ namespace DMCompiler.DM.Visitors {
         public void VisitGlobalIdentifier(DMASTGlobalIdentifier globalIdentifier) {
             string name = globalIdentifier.Identifier;
 
-            int? globalId = _dmObject?.GetGlobalVariableId(name);
-            if (globalId != null) {
-                Result = new Expressions.GlobalField(globalIdentifier.Location, DMObjectTree.Globals[globalId.Value].Type, globalId.Value);
-                return;
-            } else if (name == "vars")
-            {
-                Result = new Expressions.GlobalVars(globalIdentifier.Location);
-                return;
+            if (CurrentScopeMode != ScopeMode.FirstPassStatic) {
+                int? globalId = _dmObject?.GetGlobalVariableId(name);
+                if (globalId != null) {
+                    Result = new Expressions.GlobalField(globalIdentifier.Location,
+                        DMObjectTree.Globals[globalId.Value].Type, globalId.Value);
+                    return;
+                } else if (name == "vars") {
+                    Result = new Expressions.GlobalVars(globalIdentifier.Location);
+                    return;
+                }
             }
 
             throw new CompileErrorException(globalIdentifier.Location, $"Unknown global \"{name}\"");
@@ -165,7 +177,7 @@ namespace DMCompiler.DM.Visitors {
         }
 
         public void VisitCallableProcIdentifier(DMASTCallableProcIdentifier procIdentifier) {
-            if (_scopeMode == "static") {
+            if (CurrentScopeMode is ScopeMode.Static or ScopeMode.FirstPassStatic) {
                 Result = new Expressions.GlobalProc(procIdentifier.Location, procIdentifier.Identifier);
             } else {
                 if (_dmObject.HasProc(procIdentifier.Identifier)) {
@@ -396,13 +408,31 @@ namespace DMCompiler.DM.Visitors {
         public void VisitEqual(DMASTEqual equal) {
             var lhs = DMExpression.Create(_dmObject, _proc, equal.A, _inferredPath);
             var rhs = DMExpression.Create(_dmObject, _proc, equal.B, _inferredPath);
-            Result = new Expressions.Equal(equal.Location, lhs, rhs);
+
+            // (x == null) can be changed to isnull(x) which compiles down to an opcode
+            // TODO: Bytecode optimizations instead
+            if (rhs is Null) {
+                Result = new IsNull(equal.Location, lhs);
+
+                return;
+            }
+
+            Result = new Equal(equal.Location, lhs, rhs);
         }
 
         public void VisitNotEqual(DMASTNotEqual notEqual) {
             var lhs = DMExpression.Create(_dmObject, _proc, notEqual.A, _inferredPath);
             var rhs = DMExpression.Create(_dmObject, _proc, notEqual.B, _inferredPath);
-            Result = new Expressions.NotEqual(notEqual.Location, lhs, rhs);
+
+            // (x != null) can be changed to !isnull(x) which compiles down to two opcodes
+            // TODO: Bytecode optimizations instead
+            if (rhs is Null) {
+                Result = new Not(notEqual.Location, new IsNull(notEqual.Location, lhs));
+
+                return;
+            }
+
+            Result = new NotEqual(notEqual.Location, lhs, rhs);
         }
 
         public void VisitEquivalent(DMASTEquivalent equivalent) {
@@ -477,6 +507,10 @@ namespace DMCompiler.DM.Visitors {
                     case List:
                     case Ternary:
                     case BinaryAnd:
+                    case IsNull:
+                    case Length:
+                    case GetStep:
+                    case GetDir:
                         return true;
                     default: return false;
                 }
@@ -577,7 +611,6 @@ namespace DMCompiler.DM.Visitors {
                         _ => throw new InvalidOperationException(),
                     };
                 }
-
                 switch (operation.Kind) {
                     case DMASTDereference.OperationKind.Field:
                     case DMASTDereference.OperationKind.FieldSafe: {
@@ -597,6 +630,10 @@ namespace DMCompiler.DM.Visitors {
                                 operation.Identifier = field;
                                 operation.GlobalId = null;
                                 operation.Path = property.Type;
+                                if (operation.Kind == DMASTDereference.OperationKind.Field &&
+                                    dmObject.IsSubtypeOf(DreamPath.Client)) {
+                                    DMCompiler.Emit(WarningCode.UnsafeClientAccess, deref.Location,"Unsafe \"client\" access. Use the \"?.\" operator instead");
+                                }
                             } else {
                                 var globalId = dmObject.GetGlobalVariableId(field);
                                 if (globalId != null) {
@@ -783,6 +820,32 @@ namespace DMCompiler.DM.Visitors {
             Result = new Expressions.IsTypeInferred(isType.Location, expr, expr.Path.Value);
         }
 
+        public void VisitIsNull(DMASTIsNull isNull) {
+            var value = DMExpression.Create(_dmObject, _proc, isNull.Value, _inferredPath);
+
+            Result = new IsNull(isNull.Location, value);
+        }
+
+        public void VisitLength(DMASTLength length) {
+            var value = DMExpression.Create(_dmObject, _proc, length.Value, _inferredPath);
+
+            Result = new Length(length.Location, value);
+        }
+
+        public void VisitGetStep(DMASTGetStep getStep) {
+            var refExpression = DMExpression.Create(_dmObject, _proc, getStep.Ref, _inferredPath);
+            var dirExpression = DMExpression.Create(_dmObject, _proc, getStep.Dir, _inferredPath);
+
+            Result = new GetStep(getStep.Location, refExpression, dirExpression);
+        }
+
+        public void VisitGetDir(DMASTGetDir getDir) {
+            var loc1 = DMExpression.Create(_dmObject, _proc, getDir.Loc1, _inferredPath);
+            var loc2 = DMExpression.Create(_dmObject, _proc, getDir.Loc2, _inferredPath);
+
+            Result = new GetDir(getDir.Location, loc1, loc2);
+        }
+
         public void VisitList(DMASTList list) {
             (DMExpression? Key, DMExpression Value)[] values = Array.Empty<(DMExpression?, DMExpression)>();
 
@@ -799,6 +862,17 @@ namespace DMCompiler.DM.Visitors {
             }
 
             Result = new Expressions.List(list.Location, values);
+        }
+
+        public void VisitDimensionalList(DMASTDimensionalList list) {
+            var sizes = new DMExpression[list.Sizes.Count];
+            for (int i = 0; i < sizes.Length; i++) {
+                var sizeExpr = DMExpression.Create(_dmObject, _proc, list.Sizes[i], _inferredPath);
+
+                sizes[i] = sizeExpr;
+            }
+
+            Result = new DimensionalList(list.Location, sizes);
         }
 
         public void VisitNewList(DMASTNewList newList) {
@@ -903,6 +977,61 @@ namespace DMCompiler.DM.Visitors {
             }
 
             Result = new Expressions.Pick(pick.Location, pickValues);
+        }
+        
+        public void VisitSin(DMASTSin sin) {
+            var expr = DMExpression.Create(_dmObject, _proc, sin.Expression, _inferredPath);
+            Result = new Expressions.Sin(sin.Location, expr);
+        }
+
+        public void VisitCos(DMASTCos cos) {
+            var expr = DMExpression.Create(_dmObject, _proc, cos.Expression, _inferredPath);
+            Result = new Expressions.Cos(cos.Location, expr);
+        }
+
+        public void VisitTan(DMASTTan tan) {
+            var expr = DMExpression.Create(_dmObject, _proc, tan.Expression, _inferredPath);
+            Result = new Expressions.Tan(tan.Location, expr);
+        }
+
+        public void VisitArcsin(DMASTArcsin arcsin) {
+            var expr = DMExpression.Create(_dmObject, _proc, arcsin.Expression, _inferredPath);
+            Result = new Expressions.Arcsin(arcsin.Location, expr);
+        }
+
+        public void VisitArccos(DMASTArccos arccos) {
+            var expr = DMExpression.Create(_dmObject, _proc, arccos.Expression, _inferredPath);
+            Result = new Expressions.Arccos(arccos.Location, expr);
+        }
+
+        public void VisitArctan(DMASTArctan arctan) {
+            var expr = DMExpression.Create(_dmObject, _proc, arctan.Expression, _inferredPath);
+            Result = new Expressions.Arctan(arctan.Location, expr);
+        }
+
+        public void VisitArctan2(DMASTArctan2 arctan2) {
+            var xexpr = DMExpression.Create(_dmObject, _proc, arctan2.XExpression, _inferredPath);
+            var yexpr = DMExpression.Create(_dmObject, _proc, arctan2.YExpression, _inferredPath);
+            Result = new Expressions.Arctan2(arctan2.Location, xexpr, yexpr);
+        }
+
+        public void VisitSqrt(DMASTSqrt sqrt) {
+            var expr = DMExpression.Create(_dmObject, _proc, sqrt.Expression, _inferredPath);
+            Result = new Expressions.Sqrt(sqrt.Location, expr);
+        }
+
+        public void VisitLog(DMASTLog log) {
+            var expr = DMExpression.Create(_dmObject, _proc, log.Expression, _inferredPath);
+            DMExpression? baseExpr = null;
+            if (log.BaseExpression != null) {
+                baseExpr = DMExpression.Create(_dmObject, _proc, log.BaseExpression, _inferredPath);
+            }
+            Result = new Expressions.Log(log.Location, expr, baseExpr);
+        }
+
+        public void VisitAbs(DMASTAbs abs) {
+            var expr = DMExpression.Create(_dmObject, _proc, abs.Expression, _inferredPath);
+            Result = new Expressions.Abs(abs.Location, expr);
         }
 
         public void VisitCall(DMASTCall call) {

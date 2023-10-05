@@ -3,7 +3,7 @@ using DMCompiler.Compiler.DM;
 using OpenDreamShared.Dream;
 using OpenDreamShared.Json;
 using System.Collections.Generic;
-using OpenDreamShared.Dream.Procs;
+using DMCompiler.Bytecode;
 
 namespace DMCompiler.DM.Expressions {
     // "abc[d]"
@@ -340,6 +340,68 @@ namespace DMCompiler.DM.Expressions {
         }
     }
 
+    // isnull(x)
+    internal sealed class IsNull : DMExpression {
+        private readonly DMExpression _value;
+
+        public IsNull(Location location, DMExpression value) : base(location) {
+            _value = value;
+        }
+
+        public override void EmitPushValue(DMObject dmObject, DMProc proc) {
+            _value.EmitPushValue(dmObject, proc);
+            proc.IsNull();
+        }
+    }
+
+    // length(x)
+    internal sealed class Length : DMExpression {
+        private readonly DMExpression _value;
+
+        public Length(Location location, DMExpression value) : base(location) {
+            _value = value;
+        }
+
+        public override void EmitPushValue(DMObject dmObject, DMProc proc) {
+            _value.EmitPushValue(dmObject, proc);
+            proc.Length();
+        }
+    }
+
+    // get_step(ref, dir)
+    internal sealed class GetStep : DMExpression {
+        private readonly DMExpression _ref;
+        private readonly DMExpression _dir;
+
+        public GetStep(Location location, DMExpression refValue, DMExpression dir) : base(location) {
+            _ref = refValue;
+            _dir = dir;
+        }
+
+        public override void EmitPushValue(DMObject dmObject, DMProc proc) {
+            _ref.EmitPushValue(dmObject, proc);
+            _dir.EmitPushValue(dmObject, proc);
+            proc.GetStep();
+        }
+    }
+
+    // get_dir(loc1, loc2)
+    internal sealed class GetDir : DMExpression {
+        private readonly DMExpression _loc1;
+        private readonly DMExpression _loc2;
+
+        public GetDir(Location location, DMExpression loc1, DMExpression loc2) : base(location) {
+            _loc1 = loc1;
+            _loc2 = loc2;
+        }
+
+        public override void EmitPushValue(DMObject dmObject, DMProc proc) {
+            _loc1.EmitPushValue(dmObject, proc);
+            _loc2.EmitPushValue(dmObject, proc);
+            proc.GetDir();
+        }
+    }
+
     // list(...)
     sealed class List : DMExpression {
         private readonly (DMExpression? Key, DMExpression Value)[] _values;
@@ -378,8 +440,7 @@ namespace DMCompiler.DM.Expressions {
         }
 
         public override bool TryAsJsonRepresentation(out object? json) {
-            List<object?> list = new();
-            Dictionary<string, object?> associatedValues = new();
+            List<object?> values = new();
 
             foreach (var value in _values) {
                 if (!value.Value.TryAsJsonRepresentation(out var jsonValue)) {
@@ -388,23 +449,52 @@ namespace DMCompiler.DM.Expressions {
                 }
 
                 if (value.Key != null) {
-                    if (value.Key is not Expressions.String keyString) { //Only string keys are supported
+                    // Null key is not supported here
+                    if (!value.Key.TryAsJsonRepresentation(out var jsonKey) || jsonKey == null) {
                         json = null;
                         return false;
                     }
 
-                    associatedValues.Add(keyString.Value, jsonValue);
+                    values.Add(new Dictionary<object, object?> {
+                        { "key", jsonKey },
+                        { "value", jsonValue }
+                    });
                 } else {
-                    list.Add(jsonValue);
+                    values.Add(jsonValue);
                 }
             }
 
-            Dictionary<string, object> jsonRepresentation = new();
-            jsonRepresentation.Add("type", JsonVariableType.List);
-            if (list.Count > 0) jsonRepresentation.Add("values", list);
-            if (associatedValues.Count > 0) jsonRepresentation.Add("associatedValues", associatedValues);
-            json = jsonRepresentation;
+            json = new Dictionary<string, object> {
+                { "type", JsonVariableType.List },
+                { "values", values }
+            };
+
             return true;
+        }
+    }
+
+    // Value of var/list/L[1][2][3]
+    internal sealed class DimensionalList : DMExpression {
+        private readonly DMExpression[] _sizes;
+
+        public DimensionalList(Location location, DMExpression[] sizes) : base(location) {
+            _sizes = sizes;
+        }
+
+        public override void EmitPushValue(DMObject dmObject, DMProc proc) {
+            // This basically emits new /list(1, 2, 3)
+
+            if (!DMObjectTree.TryGetTypeId(DreamPath.List, out var listTypeId)) {
+                DMCompiler.Emit(WarningCode.ItemDoesntExist, Location, "Could not get type ID of /list");
+                return;
+            }
+
+            foreach (var size in _sizes) {
+                size.EmitPushValue(dmObject, proc);
+            }
+
+            proc.PushType(listTypeId);
+            proc.CreateObject(DMCallArgumentsType.FromStack, _sizes.Length);
         }
     }
 
@@ -551,6 +641,256 @@ namespace DMCompiler.DM.Expressions {
 
         public override void EmitPushValue(DMObject dmObject, DMProc proc) {
             proc.PushProc(proc.Id);
+        }
+    }
+
+    class Sin : DMExpression {
+        DMExpression _expr;
+
+        public Sin(Location location, DMExpression expr) : base(location) {
+            _expr = expr;
+        }
+        
+        public override bool TryAsConstant(out Constant constant) {
+            if (!_expr.TryAsConstant(out constant)) {
+                constant = null;
+                return false;
+            }
+
+            constant = constant.Sin();
+            return true;
+        }
+
+        public override void EmitPushValue(DMObject dmObject, DMProc proc) {
+            _expr.EmitPushValue(dmObject, proc);
+            proc.Sin();
+        }
+    }
+
+    class Cos : DMExpression {
+        DMExpression _expr;
+
+        public Cos(Location location, DMExpression expr) : base(location) {
+            _expr = expr;
+        }
+        
+        public override bool TryAsConstant(out Constant constant) {
+            if (!_expr.TryAsConstant(out constant)) {
+                constant = null;
+                return false;
+            }
+
+            constant = constant.Cos();
+            return true;
+        }
+
+        public override void EmitPushValue(DMObject dmObject, DMProc proc) {
+            _expr.EmitPushValue(dmObject, proc);
+            proc.Cos();
+        }
+    }
+
+    class Tan : DMExpression {
+        DMExpression _expr;
+
+        public Tan(Location location, DMExpression expr) : base(location) {
+            _expr = expr;
+        }
+        
+        public override bool TryAsConstant(out Constant constant) {
+            if (!_expr.TryAsConstant(out constant)) {
+                constant = null;
+                return false;
+            }
+
+            constant = constant.Tan();
+            return true;
+        }
+
+        public override void EmitPushValue(DMObject dmObject, DMProc proc) {
+            _expr.EmitPushValue(dmObject, proc);
+            proc.Tan();
+        }
+    }
+
+    class Arcsin : DMExpression {
+        DMExpression _expr;
+
+        public Arcsin(Location location, DMExpression expr) : base(location) {
+            _expr = expr;
+        }
+        
+        public override bool TryAsConstant(out Constant constant) {
+            if (!_expr.TryAsConstant(out constant)) {
+                constant = null;
+                return false;
+            }
+
+            constant = constant.Arcsin();
+            return true;
+        }
+
+        public override void EmitPushValue(DMObject dmObject, DMProc proc) {
+            _expr.EmitPushValue(dmObject, proc);
+            proc.Arcsin();
+        }
+    }
+
+    class Arccos : DMExpression {
+        DMExpression _expr;
+
+        public Arccos(Location location, DMExpression expr) : base(location) {
+            _expr = expr;
+        }
+        
+        public override bool TryAsConstant(out Constant constant) {
+            if (!_expr.TryAsConstant(out constant)) {
+                constant = null;
+                return false;
+            }
+
+            constant = constant.Arccos();
+            return true;
+        }
+
+        public override void EmitPushValue(DMObject dmObject, DMProc proc) {
+            _expr.EmitPushValue(dmObject, proc);
+            proc.Arccos();
+        }
+    }
+
+    class Arctan : DMExpression {
+        DMExpression _expr;
+
+        public Arctan(Location location, DMExpression expr) : base(location) {
+            _expr = expr;
+        }
+        
+        public override bool TryAsConstant(out Constant constant) {
+            if (!_expr.TryAsConstant(out constant)) {
+                constant = null;
+                return false;
+            }
+
+            constant = constant.Arctan();
+            return true;
+        }
+
+        public override void EmitPushValue(DMObject dmObject, DMProc proc) {
+            _expr.EmitPushValue(dmObject, proc);
+            proc.Arctan();
+        }
+    }
+
+    class Arctan2 : DMExpression {
+        DMExpression _xexpr;
+        DMExpression _yexpr;
+
+        public Arctan2(Location location, DMExpression xexpr, DMExpression yexpr) : base(location) {
+            _xexpr = xexpr;
+            _yexpr = yexpr;
+        }
+        
+        public override bool TryAsConstant(out Constant constant) {
+            if (!_xexpr.TryAsConstant(out Constant xconst) || !_yexpr.TryAsConstant(out Constant yconst)) {
+                constant = null;
+                return false;
+            }
+
+            constant = xconst.Arctan2(yconst);
+            return true;
+        }
+
+        public override void EmitPushValue(DMObject dmObject, DMProc proc) {
+            _xexpr.EmitPushValue(dmObject, proc);
+            _yexpr.EmitPushValue(dmObject, proc);
+            proc.Arctan2();
+        }
+    }
+
+    class Sqrt : DMExpression {
+        DMExpression _expr;
+
+        public Sqrt(Location location, DMExpression expr) : base(location) {
+            _expr = expr;
+        }
+
+        public override bool TryAsConstant(out Constant constant) {
+            if (!_expr.TryAsConstant(out constant)) {
+                constant = null;
+                return false;
+            }
+
+            constant = constant.Sqrt();
+            return true;
+        }
+
+        public override void EmitPushValue(DMObject dmObject, DMProc proc) {
+            _expr.EmitPushValue(dmObject, proc);
+            proc.Sqrt();
+        }
+    }
+
+    class Log : DMExpression {
+        DMExpression _expr;
+        DMExpression? _baseExpr;
+
+        public Log(Location location, DMExpression expr, DMExpression? baseExpr) : base(location) {
+            _expr = expr;
+            _baseExpr = baseExpr;
+        }
+        
+        public override bool TryAsConstant(out Constant constant) {
+            if (!_expr.TryAsConstant(out constant)) {
+                constant = null;
+                return false;
+            }
+
+            if (_baseExpr == null) {
+                constant = constant.Log(null);
+                return true;
+            }
+
+            if (!_baseExpr.TryAsConstant(out Constant baseConstant)) {
+                constant = null;
+                return false;
+            }
+
+            constant = constant.Log(baseConstant);
+            return true;
+        }
+
+        public override void EmitPushValue(DMObject dmObject, DMProc proc) {
+            _expr.EmitPushValue(dmObject, proc);
+            if (_baseExpr == null) {
+                proc.LogE();
+            } else {
+                _baseExpr.EmitPushValue(dmObject, proc);
+                proc.Log();
+            }
+        }
+    }
+
+    class Abs : DMExpression {
+        DMExpression _expr;
+
+        public Abs(Location location, DMExpression expr) : base(location) {
+            _expr = expr;
+        }
+
+        public override bool TryAsConstant(out Constant constant) {
+            if (!_expr.TryAsConstant(out constant)) {
+                constant = null;
+                return false;
+            }
+
+            constant = constant.Abs();
+            return true;
+        }
+
+        public override void EmitPushValue(DMObject dmObject, DMProc proc) {
+            _expr.EmitPushValue(dmObject, proc);
+            proc.Abs();
         }
     }
 }
