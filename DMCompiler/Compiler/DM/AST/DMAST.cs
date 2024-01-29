@@ -35,9 +35,9 @@ public sealed class DMASTProcBlockInner : DMASTNode {
         if (statement.IsAggregateOr<DMASTProcStatementSet>()) {
             // If this is a Set statement or a set of Set statements
             Statements = Array.Empty<DMASTProcStatement>();
-            SetStatements = new[] { statement };
+            SetStatements = [statement];
         } else {
-            Statements = new[] { statement };
+            Statements = [statement];
             SetStatements = Array.Empty<DMASTProcStatement>();
         }
     }

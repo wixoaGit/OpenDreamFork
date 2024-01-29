@@ -1,17 +1,13 @@
+using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 
 namespace DMCompiler.Compiler;
 
 public class Parser<SourceType> {
-    /// <summary> Includes errors and warnings accumulated by this parser. </summary>
-    /// <remarks> These initial capacities are arbitrary. We just assume there's a decent chance you'll get a handful of errors/warnings. </remarks>
-    public List<CompilerEmission> Emissions = new(8);
-
     protected Lexer<SourceType> _lexer;
     private Token _currentToken;
     private readonly Stack<Token> _tokenStack = new(1);
-    /// <summary>The maximum number of errors or warnings we'd ever place into <see cref="Emissions"/>.</summary>
-    protected const int MAX_EMISSIONS_RECORDED = 50_000_000;
 
     protected Parser(Lexer<SourceType> lexer) {
         _lexer = lexer;
@@ -59,6 +55,18 @@ public class Parser<SourceType> {
         return false;
     }
 
+    protected bool Check(TokenType type, [NotNullWhen(true)] out Token? token) {
+        if (Current().Type == type) {
+            token = Current();
+
+            Advance();
+            return true;
+        }
+
+        token = null;
+        return false;
+    }
+
     protected bool Check(TokenType[] types) {
         TokenType currentType = Current().Type;
         foreach (TokenType type in types) {
@@ -94,13 +102,12 @@ public class Parser<SourceType> {
     /// <remarks> This implementation on <see cref="Parser{SourceType}"/> does not make use of <see cref="WarningCode"/> <br/>
     /// since there are some parsers that aren't always in the compilation context, like the ones for DMF and DMM. <br/>
     /// </remarks>
+    [Obsolete("This is not a desirable way to emit an error, as errors should emit an error code and not cause unnecessary throws. Use DMCompiler.Emit() instead.")]
     protected void Error(string message, bool throwException = true) {
-        CompilerEmission error = new CompilerEmission(ErrorLevel.Error, _currentToken.Location, message);
+        DMCompiler.Emit(WarningCode.Unknown, _currentToken.Location, message);
 
-        if(Emissions.Count < MAX_EMISSIONS_RECORDED)
-            Emissions.Add(error);
         if (throwException)
-            throw new CompileErrorException(error);
+            throw new CompileErrorException(message);
     }
 
     /// <summary>
@@ -111,6 +118,6 @@ public class Parser<SourceType> {
     /// </remarks>
     protected void Warning(string message, Token? token = null) {
         token ??= _currentToken;
-        Emissions.Add(new CompilerEmission(ErrorLevel.Warning, token?.Location, message));
+        DMCompiler.ForcedWarning(token.Value.Location, message);
     }
 }

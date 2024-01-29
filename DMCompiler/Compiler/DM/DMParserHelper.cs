@@ -8,26 +8,6 @@ using DMCompiler.Compiler.DM.AST;
 namespace DMCompiler.Compiler.DM;
 
 public partial class DMParser {
-    /// <summary>
-    /// A special override of Error() since, for DMParser, we know we are in a compilation context and can make use of error codes.
-    /// </summary>
-    /// <remarks>
-    /// Should only be called AFTER <see cref="DMCompiler"/> has built up its list of pragma configurations.
-    /// </remarks>
-    /// <returns> True if this will raise an error, false if not. You can use this return value to help improve error emission around this (depending on how permissive we're being)</returns>
-    protected bool Error(WarningCode code, string message) {
-        ErrorLevel level = DMCompiler.CodeToLevel(code);
-        if (Emissions.Count < MAX_EMISSIONS_RECORDED)
-            Emissions.Add(new CompilerEmission(level, code, Current().Location, message));
-        return level == ErrorLevel.Error;
-    }
-
-    /// <inheritdoc cref="Parser{SourceType}.Error(string, bool)"/>
-    [Obsolete("This is not a desirable way for DMParser to emit an error, as errors should emit an error code and not cause unnecessary throws. Use DMParser's overrides of this method, instead.")]
-    protected new void Error(string message, bool throwException = true) {
-        base.Error(message, throwException);
-    }
-
     protected bool PeekDelimiter() {
         return Current().Type == TokenType.Newline || Current().Type == TokenType.DM_Semicolon;
     }

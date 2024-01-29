@@ -108,10 +108,6 @@ public struct CompilerEmission {
 public class CompileErrorException : Exception {
     public CompilerEmission Error;
 
-    public CompileErrorException(CompilerEmission error) : base(error.Message) {
-        Error = error;
-    }
-
     public CompileErrorException(Location location, string message) : base(message) {
         Error = new CompilerEmission(ErrorLevel.Error, location, message);
     }
@@ -128,9 +124,6 @@ public class CompileErrorException : Exception {
 /// like an abnormal state being reached or something.
 /// </summary>
 public sealed class CompileAbortException : CompileErrorException {
-    public CompileAbortException(CompilerEmission error) : base(error) {
-    }
-
     public CompileAbortException(Location location, string message) : base(location, message) {
     }
 
