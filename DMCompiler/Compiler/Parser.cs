@@ -31,9 +31,6 @@ public class Parser<SourceType> {
             if (_currentToken.Type == TokenType.Error) {
                 Error((string)_currentToken.Value!, throwException: false);
                 Advance();
-            } else if (_currentToken.Type == TokenType.Warning) {
-                Warning((string)_currentToken.Value!);
-                Advance();
             }
         }
 
@@ -108,16 +105,5 @@ public class Parser<SourceType> {
 
         if (throwException)
             throw new CompileErrorException(message);
-    }
-
-    /// <summary>
-    /// Emits a warning discovered during parsing, optionally causing a throw.
-    /// </summary>
-    /// <remarks> This implementation on <see cref="Parser{SourceType}"/> does not make use of <see cref="WarningCode"/> <br/>
-    /// since there are some parsers that aren't always in the compilation context, like the ones for DMF and DMM. <br/>
-    /// </remarks>
-    protected void Warning(string message, Token? token = null) {
-        token ??= _currentToken;
-        DMCompiler.ForcedWarning(token.Value.Location, message);
     }
 }

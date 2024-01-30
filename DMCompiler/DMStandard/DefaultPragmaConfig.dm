@@ -20,17 +20,19 @@
 #pragma PointlessBuiltinCall warning
 #pragma SuspiciousMatrixCall warning
 #pragma FallbackBuiltinArgument warning
+#pragma ListDoublyInitialized warning
 #pragma MalformedRange warning
 #pragma InvalidRange error
 #pragma InvalidSetStatement error
 #pragma InvalidOverride warning
 #pragma DanglingVarType warning
 #pragma MissingInterpolatedExpression warning
+#pragma TextMacroBadCapitalization warning
 #pragma AmbiguousResourcePath warning
-#pragma SuspiciousSwitchCase warning
 
 //3000-3999
 #pragma EmptyBlock notice
 #pragma EmptyProc disabled // NOTE: If you enable this in OD's default pragma config file, it will emit for OD's DMStandard. Put it in your codebase's pragma config file.
 #pragma UnsafeClientAccess disabled // NOTE: Only checks for unsafe accesses like "client.foobar" and doesn't consider if the client was already null-checked earlier in the proc
+#pragma SuspiciousSwitchCase warning
 #pragma AssignmentInConditional warning 

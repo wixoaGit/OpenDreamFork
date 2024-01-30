@@ -9,7 +9,7 @@ namespace DMCompiler.Compiler.DMM;
 
 internal sealed class DMMParser(DMLexer lexer, int zOffset) : DMParser(lexer) {
     private int _cellNameLength = -1;
-    private readonly HashSet<DreamPath> _skippedTypes = new();
+    private readonly HashSet<DreamPath> _missingTypes = new();
 
     public DreamMapJson ParseMap() {
         DreamMapJson map = new DreamMapJson();
@@ -55,8 +55,9 @@ internal sealed class DMMParser(DMLexer lexer, int zOffset) : DMParser(lexer) {
             DMASTPath? objectType = Path();
             while (objectType != null) {
                 bool skipType = !DMObjectTree.TryGetTypeId(objectType.Path, out int typeId);
-                if (skipType && _skippedTypes.Add(objectType.Path)) {
-                    Warning($"Skipping type '{objectType.Path}'");
+                if (skipType && _missingTypes.Add(objectType.Path)) {
+                    DMCompiler.Emit(WarningCode.ItemDoesntExist, objectType.Location,
+                        $"Type '{objectType.Path}' doesn't exist");
                 }
 
                 MapObjectJson mapObject = new MapObjectJson(typeId);

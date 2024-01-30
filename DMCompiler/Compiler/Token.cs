@@ -6,7 +6,6 @@ namespace DMCompiler.Compiler;
 public enum TokenType : byte {
     //Base lexer
     Error,
-    Warning,
     Unknown,
     Skip, //Internally skipped by the lexer
 

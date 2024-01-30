@@ -158,7 +158,9 @@ namespace DMCompiler.Compiler.DM {
                 if (Current().Type != TokenType.EndOfFile) {
                     Token skipFrom = Current();
                     LocateNextTopLevel();
-                    Warning($"Error recovery had to skip to {CurrentLoc}", token: skipFrom);
+
+                    DMCompiler.Emit(WarningCode.ErrorRecoverySkip, skipFrom.Location,
+                        $"Error recovery had to skip to {CurrentLoc}");
                 }
             }
 
@@ -273,7 +275,10 @@ namespace DMCompiler.Compiler.DM {
                         DMASTExpression? value = PathArray(ref varPath);
 
                         if (Check(TokenType.DM_Equals)) {
-                            if (value != null) Warning("List doubly initialized");
+                            if (value != null) {
+                                DMCompiler.Emit(WarningCode.ListDoublyInitialized, CurrentLoc,
+                                    "List doubly initialized");
+                            }
 
                             Whitespace();
                             value = Expression();

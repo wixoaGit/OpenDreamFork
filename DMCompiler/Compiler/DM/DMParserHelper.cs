@@ -151,7 +151,9 @@ public partial class DMParser {
                             switch (escapeSequence) {
                                 case "Proper": // Users can have a little case-insensitivity, as a treat
                                 case "Improper":
-                                    Warning($"Escape sequence \"\\{escapeSequence}\" should not be capitalized. Coercing macro to \"\\{escapeSequence.ToLower()}");
+                                    DMCompiler.Emit(WarningCode.TextMacroBadCapitalization, CurrentLoc,
+                                        $"Escape sequence \"\\{escapeSequence}\" should not be capitalized.");
+
                                     escapeSequence = escapeSequence.ToLower();
                                     goto case "proper"; // Fallthrough!
                                 case "proper":
@@ -229,7 +231,9 @@ public partial class DMParser {
                                     break;
 
                                 case "Him": // BYOND errors here but lets be nice!
-                                    Warning("\"\\Him\" is not an available text macro. Coercing macro into \"\\him\"");
+                                    DMCompiler.Emit(WarningCode.TextMacroBadCapitalization, CurrentLoc,
+                                        "Bad capitalization, \"\\Him\" should be \"\\him\".");
+
                                     goto case "him"; // Fallthrough!
                                 case "him":
                                     if (CheckInterpolation(tokenLoc, hasSeenNonRefInterpolation, interpolationValues, "him")) break;

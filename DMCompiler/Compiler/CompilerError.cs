@@ -9,6 +9,7 @@ public enum WarningCode {
     // 0 - 999 are reserved for giving codes to fatal errors which cannot reasonably be demoted to a warning/notice/disable.
     Unknown = 0,
     BadToken = 1,
+    ErrorRecoverySkip = 2,
     BadDirective = 10,
     BadExpression = 11,
     MissingExpression = 12,
@@ -46,12 +47,14 @@ public enum WarningCode {
     PointlessBuiltinCall = 2206, // For pointless calls to issaved() or initial()
     SuspiciousMatrixCall = 2207, // Calling matrix() with seemingly the wrong arguments
     FallbackBuiltinArgument = 2208, // A builtin (sin(), cos(), etc) with an invalid/fallback argument
+    ListDoublyInitialized = 2209,
     MalformedRange = 2300,
     InvalidRange = 2301,
     InvalidSetStatement = 2302,
     InvalidOverride = 2303,
     DanglingVarType = 2401, // For types inferred by a particular var definition and nowhere else, that ends up not existing (not forced-fatal because BYOND doesn't always error)
     MissingInterpolatedExpression = 2500, // A text macro is missing a required interpolated expression
+    TextMacroBadCapitalization = 2501,
     AmbiguousResourcePath = 2600,
 
     // 3000 - 3999 are reserved for stylistic configuration.
