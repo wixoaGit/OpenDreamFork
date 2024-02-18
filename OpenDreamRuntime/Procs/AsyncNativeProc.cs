@@ -1,6 +1,7 @@
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
+using DMCompiler.DM;
 using OpenDreamRuntime.Objects;
 using OpenDreamRuntime.Resources;
 using OpenDreamShared.Dream;
@@ -174,8 +175,8 @@ namespace OpenDreamRuntime.Procs {
 
         private readonly nuint _locationId;
 
-        public AsyncNativeProc(int id, DreamPath owningType, string name, List<String> argumentNames, Dictionary<string, DreamValue> defaultArgumentValues, Func<State, Task<DreamValue>> taskFunc)
-            : base(id, owningType, name, null, ProcAttributes.None, argumentNames, null, null, null, null, 0) {
+        public AsyncNativeProc(int id, TreeEntry owningType, string name, List<String> argumentNames, Dictionary<string, DreamValue> defaultArgumentValues, Func<State, Task<DreamValue>> taskFunc)
+            : base(id, owningType, name, null, ProcAttributes.None, argumentNames, null, null, null, null, null, 0) {
             _defaultArgumentValues = defaultArgumentValues;
             _taskFunc = taskFunc;
             _locationId = ProfilerInternal.CreateLocation(name, "NativeProcs.cs", 0);

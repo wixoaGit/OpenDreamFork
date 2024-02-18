@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Diagnostics.Contracts;
 using System.Runtime.CompilerServices;
+using DMCompiler.DM;
 using OpenDreamRuntime.Objects;
 using OpenDreamRuntime.Resources;
 using OpenDreamShared.Dream;
@@ -45,6 +46,7 @@ public sealed unsafe class NativeProc : DreamProc {
     private readonly AtomManager _atomManager;
     private readonly IDreamMapManager _mapManager;
     private readonly DreamResourceManager _resourceManager;
+    private readonly WalkManager _walkManager;
     private readonly DreamObjectTree _objectTree;
 
     public readonly ref struct Bundle {
@@ -57,6 +59,7 @@ public sealed unsafe class NativeProc : DreamProc {
         public AtomManager AtomManager => Proc._atomManager;
         public IDreamMapManager MapManager => Proc._mapManager;
         public DreamResourceManager ResourceManager => Proc._resourceManager;
+        public WalkManager WalkManager => Proc._walkManager;
         public DreamObjectTree ObjectTree => Proc._objectTree;
 
         public Bundle(NativeProc proc, DreamProcArguments arguments) {
@@ -84,8 +87,8 @@ public sealed unsafe class NativeProc : DreamProc {
 
     private readonly nuint _locationId;
 
-        public NativeProc(int id, DreamPath owningType, string name, List<string> argumentNames, Dictionary<string, DreamValue> defaultArgumentValues, HandlerFn handler, DreamManager dreamManager, AtomManager atomManager, IDreamMapManager mapManager, DreamResourceManager resourceManager, DreamObjectTree objectTree)
-        : base(id, owningType, name, null, ProcAttributes.None, argumentNames, null, null, null, null, 0) {
+        public NativeProc(int id, TreeEntry owningType, string name, List<string> argumentNames, Dictionary<string, DreamValue> defaultArgumentValues, HandlerFn handler, DreamManager dreamManager, AtomManager atomManager, IDreamMapManager mapManager, DreamResourceManager resourceManager, WalkManager walkManager, DreamObjectTree objectTree)
+        : base(id, owningType, name, null, ProcAttributes.None, argumentNames, null, null, null, null, null, 0) {
         _defaultArgumentValues = defaultArgumentValues;
         _handler = (delegate*<Bundle, DreamObject?, DreamObject?, DreamValue>)handler.Method.MethodHandle.GetFunctionPointer();
 
@@ -93,7 +96,7 @@ public sealed unsafe class NativeProc : DreamProc {
             _atomManager = atomManager;
             _mapManager = mapManager;
             _resourceManager = resourceManager;
-            _objectTree = objectTree;
+            _walkManager = walkManager;_objectTree = objectTree;
 
             _locationId = ProfilerInternal.CreateLocation(name, "NativeProcs.cs", 0);
         }

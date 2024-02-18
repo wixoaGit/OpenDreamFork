@@ -21,12 +21,18 @@ namespace OpenDreamClient {
         [Dependency] private readonly IDreamSoundEngine _soundEngine = default!;
         [Dependency] private readonly IOverlayManager _overlayManager = default!;
         [Dependency] private readonly ILightManager _lightManager = default!;
+        [Dependency] private readonly IConfigurationManager _configurationManager = default!;
 
         private const string UserAgent =
             "Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 6.2; WOW64; Trident/7.0; .NET4.0C; .NET4.0E; .NET CLR 2.0.50727; .NET CLR 3.0.30729; .NET CLR 3.5.30729)";
 
         public override void PreInit() {
             var config = IoCManager.Resolve<IConfigurationManager>();
+
+            // We share settings with other RT games, such as SS14.
+            // SS14 supports fullscreen, but it breaks us horribly. This disables fullscreen if it's already set.
+            config.SetCVar(CVars.DisplayWindowMode, 0);
+
             if (config.GetCVar(OpenDreamCVars.SpoofIEUserAgent)) {
                 config.OverrideDefault(WCVars.WebUserAgentOverride, UserAgent);
             }
@@ -71,6 +77,12 @@ namespace OpenDreamClient {
 
             _dreamInterface.Initialize();
             IoCManager.Resolve<IDreamSoundEngine>().Initialize();
+
+            if (_configurationManager.GetCVar(CVars.DisplayCompat))
+                _dreamInterface.OpenAlert(
+                    "Compatibility Mode Warning",
+                    "You are using compatibility mode. Clicking in-game objects is not supported in this mode.",
+                    "Ok", null, null, null);
         }
 
         protected override void Dispose(bool disposing) {

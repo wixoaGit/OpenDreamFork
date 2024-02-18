@@ -1,10 +1,11 @@
-﻿using System.Diagnostics.CodeAnalysis;
+﻿using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
+using DMCompiler.Json;
 using OpenDreamRuntime;
 using OpenDreamRuntime.Objects;
 using OpenDreamRuntime.Objects.Types;
 using OpenDreamRuntime.Procs;
 using OpenDreamShared.Dream;
-using OpenDreamShared.Json;
 using Robust.Shared.GameObjects;
 using Robust.Shared.Maths;
 
@@ -17,9 +18,9 @@ namespace Content.Tests {
 
         public void UpdateTiles() { }
 
-        public void LoadAreasAndTurfs(DreamMapJson map) { }
+        public void LoadMaps(List<DreamMapJson>? maps) { }
 
-        public void InitializeAtoms(DreamMapJson map) { }
+        public void InitializeAtoms(List<DreamMapJson>? maps) { }
 
         public void SetTurf(DreamObjectTurf turf, DreamObjectDefinition type, DreamProcArguments creationArguments) { }
 
