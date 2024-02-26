@@ -11,6 +11,7 @@ public sealed class ProcDefinitionJson {
     public List<ProcArgumentJson>? Arguments { get; set; }
     public List<LocalVariableJson> Locals { get; set; }
     public ProcAttributes Attributes { get; set; } = ProcAttributes.None;
+    public SourceInfoJson SourceLocation { get; set; }
     public List<SourceInfoJson> SourceInfo { get; set; }
     public byte[]? Bytecode { get; set; }
 

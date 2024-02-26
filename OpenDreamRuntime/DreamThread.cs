@@ -6,7 +6,6 @@ using OpenDreamRuntime.Objects;
 using OpenDreamRuntime.Procs;
 using OpenDreamRuntime.Procs.DebugAdapter;
 using OpenDreamShared.Dream;
-using OpenDreamShared.Dream.Procs;
 using PER.Tracy;
 
 namespace OpenDreamRuntime {

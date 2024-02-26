@@ -4,8 +4,6 @@ using System.Threading.Tasks;
 using DMCompiler.DM;
 using OpenDreamRuntime.Objects;
 using OpenDreamRuntime.Resources;
-using OpenDreamShared.Dream;
-using OpenDreamShared.Dream.Procs;
 using PER.Tracy;
 using Dependency = Robust.Shared.IoC.DependencyAttribute;
 

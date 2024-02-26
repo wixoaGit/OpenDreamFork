@@ -4,8 +4,6 @@ using System.Runtime.CompilerServices;
 using DMCompiler.DM;
 using OpenDreamRuntime.Objects;
 using OpenDreamRuntime.Resources;
-using OpenDreamShared.Dream;
-using OpenDreamShared.Dream.Procs;
 using PER.Tracy;
 
 namespace OpenDreamRuntime.Procs;
@@ -87,19 +85,19 @@ public sealed unsafe class NativeProc : DreamProc {
 
     private readonly nuint _locationId;
 
-        public NativeProc(int id, TreeEntry owningType, string name, List<string> argumentNames, Dictionary<string, DreamValue> defaultArgumentValues, HandlerFn handler, DreamManager dreamManager, AtomManager atomManager, IDreamMapManager mapManager, DreamResourceManager resourceManager, WalkManager walkManager, DreamObjectTree objectTree)
-        : base(id, owningType, name, null, ProcAttributes.None, argumentNames, null, null, null, null, null, 0) {
+    public NativeProc(int id, TreeEntry owningType, string name, List<string> argumentNames, Dictionary<string, DreamValue> defaultArgumentValues, HandlerFn handler, DreamManager dreamManager, AtomManager atomManager, IDreamMapManager mapManager, DreamResourceManager resourceManager, WalkManager walkManager, DreamObjectTree objectTree)
+    : base(id, owningType, name, null, ProcAttributes.None, argumentNames, null, null, null, null, null, 0) {
         _defaultArgumentValues = defaultArgumentValues;
         _handler = (delegate*<Bundle, DreamObject?, DreamObject?, DreamValue>)handler.Method.MethodHandle.GetFunctionPointer();
 
-            _dreamManager = dreamManager;
-            _atomManager = atomManager;
-            _mapManager = mapManager;
-            _resourceManager = resourceManager;
-            _walkManager = walkManager;_objectTree = objectTree;
+        _dreamManager = dreamManager;
+        _atomManager = atomManager;
+        _mapManager = mapManager;
+        _resourceManager = resourceManager;
+        _walkManager = walkManager;_objectTree = objectTree;
 
-            _locationId = ProfilerInternal.CreateLocation(name, "NativeProcs.cs", 0);
-        }
+        _locationId = ProfilerInternal.CreateLocation(name, "NativeProcs.cs", 0);
+    }
 
     public override ProcState CreateState(DreamThread thread, DreamObject? src, DreamObject? usr,
         DreamProcArguments arguments) {
