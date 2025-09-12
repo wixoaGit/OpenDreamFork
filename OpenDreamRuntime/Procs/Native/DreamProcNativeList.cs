@@ -68,7 +68,7 @@ namespace OpenDreamRuntime.Procs.Native {
             int index = bundle.GetArgument(0, "Index").MustGetValueAsInteger(); //1-indexed
             DreamList list = (DreamList)src!;
 
-            if (index <= 0) index = list.GetLength() + 1;
+            if (index <= 0) index = list.Length + 1;
             if (bundle.Arguments.Length < 2) throw new Exception("No value given to insert");
 
             for (var i = 1; i < bundle.Arguments.Length; i++) {
@@ -174,7 +174,7 @@ namespace OpenDreamRuntime.Procs.Native {
 
             list.Cut(startIndex, end);
 
-            if (startIndex <= 0) startIndex = list.GetLength() + 1;
+            if (startIndex <= 0) startIndex = list.Length + 1;
             if (bundle.Arguments.Length < 3) return DreamValue.Null;
 
             // i = 2 is Item1

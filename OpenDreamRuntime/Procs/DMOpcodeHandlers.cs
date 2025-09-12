@@ -880,7 +880,7 @@ namespace OpenDreamRuntime.Procs {
                 DreamList newList = state.Proc.ObjectTree.CreateList();
 
                 if (second.TryGetValueAsDreamList(out var secondList)) {
-                    int len = list.GetLength();
+                    int len = list.Length;
 
                     for (int i = 1; i <= len; i++) {
                         DreamValue value = list.GetValue(new DreamValue(i));
@@ -893,7 +893,7 @@ namespace OpenDreamRuntime.Procs {
                         }
                     }
                 } else {
-                    int len = list.GetLength();
+                    int len = list.Length;
 
                     for (int i = 1; i <= len; i++) {
                         DreamValue value = list.GetValue(new DreamValue(i));

@@ -434,7 +434,7 @@ public sealed class DreamObjectSavefile : DreamObject {
                     SFDreamListValue jsonEncodedList = new SFDreamListValue();
                     int thisObjectCount = objectCount;
                     if(dreamList.IsAssociative)
-                        jsonEncodedList.AssocData = new List<SFDreamJsonValue?>(dreamList.GetLength()); //only init the list if it's needed
+                        jsonEncodedList.AssocData = new List<SFDreamJsonValue?>(dreamList.Length); //only init the list if it's needed
 
                     foreach (var keyValue in dreamList.EnumerateValues()) { //get all normal values and keys
                         if(keyValue.TryGetValueAsDreamObject(out var _) && !keyValue.IsNull) {

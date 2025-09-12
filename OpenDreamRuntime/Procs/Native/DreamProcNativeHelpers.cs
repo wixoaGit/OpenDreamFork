@@ -365,7 +365,7 @@ internal static partial class DreamProcNativeHelpers {
         matrix = ColorMatrix.Identity;
         var listArray = list.GetValues();
         try {
-            switch (list.GetLength()) {
+            switch (list.Length) {
                 case 0:
                     return true; // Just return the identity matrix. NOTE: Not sure if *exactly* parity.
                 case 1: // 0 to 5 is the rgb() string spam:

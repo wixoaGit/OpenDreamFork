@@ -3,6 +3,7 @@ namespace OpenDreamRuntime.Objects.Types;
 // TODO: An arglist given to New() can be used to initialize an alist with values
 public sealed class DreamAssocList(DreamObjectDefinition aListDef, int size) : DreamObject(aListDef), IDreamList {
     public bool IsAssociative => true;
+    public int Length => _values.Count;
 
     private readonly Dictionary<DreamValue, DreamValue> _values = new(size);
 

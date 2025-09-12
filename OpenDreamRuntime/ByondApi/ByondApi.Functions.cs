@@ -298,12 +298,12 @@ public static unsafe partial class ByondApi {
 
         return RunOnMainThread<byte>(() => {
             DreamValue srcValue = ValueFromDreamApi(*loc);
-            if (!srcValue.TryGetValueAsDreamList(out var srcList)) {
+            if (!srcValue.TryGetValueAsIDreamList(out var srcList)) {
                 *len = 0;
                 return 0;
             }
 
-            int length = srcList.GetLength();
+            int length = srcList.Length;
             *len = (uint)length;
             if (list == null || providedBufLen < length) {
                 return 0;

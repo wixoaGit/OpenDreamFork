@@ -1146,7 +1146,7 @@ internal static class DreamProcNativeRoot {
         }
 
         // Null if there are no steps
-        return new(result.GetLength() > 0 ? result : null);
+        return new(result.Length > 0 ? result : null);
     }
 
     [DreamProc("hascall")]
@@ -1595,7 +1595,7 @@ internal static class DreamProcNativeRoot {
         if (value.TryGetValueAsString(out var str)) {
             return new DreamValue(countBytes ? str.Length : str.EnumerateRunes().Count());
         } else if (value.TryGetValueAsDreamList(out var list)) {
-            return new DreamValue(list.GetLength());
+            return new DreamValue(list.Length);
         } else if (value.Type is DreamValueType.Float or DreamValueType.DreamObject or DreamValueType.DreamType) {
             return new DreamValue(0);
         }
@@ -3285,7 +3285,7 @@ internal static class DreamProcNativeRoot {
 
         if (argList.TryGetValueAsDreamList(out var list)) {
             if (!list.IsAssociative) {
-                cutCount = list.GetLength();
+                cutCount = list.Length;
                 list.Cut();
                 return new DreamValue(cutCount);
             }
