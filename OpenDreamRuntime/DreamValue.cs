@@ -70,7 +70,7 @@ public struct DreamValue : IEquatable<DreamValue> {
     //ReSharper disable once NotAccessedField.Local
     private readonly ProfilerMemory? _tracyMemoryId; //only used for strings, since everything else is a value type or handled in DreamObject
     #endif
-    
+
     public DreamValue(string value) {
         DebugTools.Assert(value != null);
         Type = DreamValueType.String;
@@ -770,7 +770,7 @@ public sealed class DreamValueColorMatrixSerializer : ITypeReader<ColorMatrix, D
             if (ColorHelpers.TryParseColor(maybeColorString, out Color basicColor)) {
                 return new ColorMatrix(basicColor);
             }
-        } else if (node.Value.TryGetValueAsDreamList(out var matrixList)) {
+        } else if (node.Value.TryGetValueAsIDreamList(out var matrixList)) {
             if (DreamProcNativeHelpers.TryParseColorMatrix(matrixList, out ColorMatrix matrix)) {
                 return matrix;
             }
@@ -783,8 +783,9 @@ public sealed class DreamValueColorMatrixSerializer : ITypeReader<ColorMatrix, D
         DreamValueDataNode node,
         IDependencyCollection dependencies,
         ISerializationContext? context = null) {
-        if (node.Value.TryGetValueAsDreamList(out var _))
+        if (node.Value.TryGetValueAsIDreamList(out _))
             return new ValidatedValueNode(node);
+
         //TODO: Improve validation
         return new ErrorNode(node, $"Value {node.Value} is not a color matrix");
     }

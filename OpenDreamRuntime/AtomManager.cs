@@ -319,7 +319,7 @@ public sealed class AtomManager {
                 value.TryGetValueAsInteger(out appearance.PixelOffset2.Y);
                 break;
             case "color":
-                if(value.TryGetValueAsDreamList(out var list)) {
+                if(value.TryGetValueAsIDreamList(out var list)) {
                     if(DreamProcNativeHelpers.TryParseColorMatrix(list, out var matrix)) {
                         appearance.SetColor(in matrix);
                         break;
@@ -384,7 +384,7 @@ public sealed class AtomManager {
             case "verbs":
                 appearance.Verbs.Clear();
 
-                if (value.TryGetValueAsDreamList(out var valueList)) {
+                if (value.TryGetValueAsIDreamList(out var valueList)) {
                     foreach (DreamValue verbValue in valueList.EnumerateValues()) {
                         if (!verbValue.TryGetValueAsProc(out var verb))
                             continue;

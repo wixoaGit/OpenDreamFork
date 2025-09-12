@@ -51,6 +51,7 @@ internal static partial class DreamProcNativeHelpers {
         int donutCount = Math.Max(widthRange, heightRange);
         for(int d = 1; d <= donutCount; d++) { // for each donut
             int sideLength = d + d + 1;
+
             //The left column
             {
                 int leftColumnX = centerPos.X - d;
@@ -61,6 +62,7 @@ internal static partial class DreamProcNativeHelpers {
                     }
                 }
             }
+
             //The criss-cross-apple-sauce
             {
                 int crissCrossLength = sideLength - 2;
@@ -70,12 +72,14 @@ internal static partial class DreamProcNativeHelpers {
                     if (mapMgr.TryGetTurfAt((startingCrossX+i, centerPos.Y - d), centerPos.Z, out var crissTurf)) {
                         yield return crissTurf;
                     }
+
                     //the cross
                     if (mapMgr.TryGetTurfAt((startingCrossX + i, centerPos.Y + d), centerPos.Z, out var crossTurf)) {
                         yield return crossTurf;
                     }
                 }
             }
+
             //The right column
             {
                 int rightColumnX = centerPos.X + d;
@@ -179,7 +183,7 @@ internal static partial class DreamProcNativeHelpers {
                     continue;
 
                 var appearance = atomManager.MustGetAppearance(cell.Turf);
-                var tile = new ViewAlgorithm.Tile() {
+                var tile = new ViewAlgorithm.Tile {
                     Opaque = appearance.Opacity,
                     Luminosity = 0,
                     DeltaX = deltaX,
@@ -346,6 +350,7 @@ internal static partial class DreamProcNativeHelpers {
                 return false;
             }
         }
+
         return true;
     }
 
@@ -361,9 +366,8 @@ internal static partial class DreamProcNativeHelpers {
     /// list(rgb() or null, rgb() or null, rgb() or null, rgb() or null, rgb() or null) <br/>
     /// </remarks>
     /// <returns>True if the list was successfully parsed, false if not.</returns>
-    public static bool TryParseColorMatrix(DreamList list, out ColorMatrix matrix) {
+    public static bool TryParseColorMatrix(IDreamList list, out ColorMatrix matrix) {
         matrix = ColorMatrix.Identity;
-        var listArray = list.GetValues();
         try {
             switch (list.Length) {
                 case 0:
@@ -373,56 +377,63 @@ internal static partial class DreamProcNativeHelpers {
                 case 3:
                 case 4:
                 case 5:
-                    for (var i = 0; i < listArray.Count && i < 5; ++i) {
-                        var listValue = listArray[i];
-                        if (listValue.TryGetValueAsString(out var RGBString)) {
-                            if (ColorHelpers.TryParseColor(RGBString, out var color, defaultAlpha: "00")) {
+                    var i = 0;
+                    foreach (var listValue in list.EnumerateValues()) {
+                        if (listValue.TryGetValueAsString(out var rgbString)) {
+                            if (ColorHelpers.TryParseColor(rgbString, out var color, defaultAlpha: "00")) {
                                 matrix.SetRow(i, color);
                             }
                         }
+
+                        i++;
                     }
+
                     return true;
                 case 9: // list(rr,rg,rb, gr,gg,gb, br,bg,bb)
-                    for (var row = 0; row < listArray.Count && row < 3; ++row) {
-                        var offset = row * 3;
-                        matrix.SetRow(row, listArray[offset].MustGetValueAsFloat(),
-                                           listArray[offset + 1].MustGetValueAsFloat(),
-                                           listArray[offset + 2].MustGetValueAsFloat(),
+                    for (var row = 0; row < 3; ++row) {
+                        var offset = row * 3 + 1;
+                        matrix.SetRow(row, list.GetValue(new(offset)).MustGetValueAsFloat(),
+                                           list.GetValue(new(offset + 1)).MustGetValueAsFloat(),
+                                           list.GetValue(new(offset + 2)).MustGetValueAsFloat(),
                                            0f);
                     }
+
                     return true;
                 case 12: // list(rr,rg,rb, gr,gg,gb, br,bg,bb, cr,cg,cb)
-                    for (var row = 0; row < listArray.Count && row < 3; ++row) {
-                        var offset = row * 3;
-                        matrix.SetRow(row, listArray[offset].MustGetValueAsFloat(),
-                                           listArray[offset + 1].MustGetValueAsFloat(),
-                                           listArray[offset + 2].MustGetValueAsFloat(),
+                    for (var row = 0; row < 3; ++row) {
+                        var offset = row * 3 + 1;
+                        matrix.SetRow(row, list.GetValue(new(offset)).MustGetValueAsFloat(),
+                                           list.GetValue(new(offset + 1)).MustGetValueAsFloat(),
+                                           list.GetValue(new(offset + 2)).MustGetValueAsFloat(),
                                            0f);
                     }
+
                     //We skip over the alpha row in this one. It's kinda wonky.
-                    matrix.SetRow(4, listArray[9].MustGetValueAsFloat(),
-                                     listArray[10].MustGetValueAsFloat(),
-                                     listArray[11].MustGetValueAsFloat(),
+                    matrix.SetRow(4, list.GetValue(new(10)).MustGetValueAsFloat(),
+                                     list.GetValue(new(11)).MustGetValueAsFloat(),
+                                     list.GetValue(new(12)).MustGetValueAsFloat(),
                                      0f);
                     return true;
 
                 case 16: // list(rr, rg, rb, ra, gr, gg, gb, ga, br, bg, bb, ba, ar, ag, ab, aa)
-                    for (var row = 0; row < listArray.Count && row < 4; ++row) {
-                        var offset = row * 4;
-                        matrix.SetRow(row, listArray[offset].MustGetValueAsFloat(),
-                                           listArray[offset + 1].MustGetValueAsFloat(),
-                                           listArray[offset + 2].MustGetValueAsFloat(),
-                                           listArray[offset + 3].MustGetValueAsFloat());
+                    for (var row = 0; row < 4; ++row) {
+                        var offset = row * 4 + 1;
+                        matrix.SetRow(row, list.GetValue(new(offset)).MustGetValueAsFloat(),
+                                           list.GetValue(new(offset + 1)).MustGetValueAsFloat(),
+                                           list.GetValue(new(offset + 2)).MustGetValueAsFloat(),
+                                           list.GetValue(new(offset + 3)).MustGetValueAsFloat());
                     }
+
                     return true;
                 case 20: // list(rr, rg, rb, ra, gr, gg, gb, ga, br, bg, bb, ba, ar, ag, ab, aa, cr, cg, cb, ca)
-                    for (var row = 0; row < listArray.Count && row < 5; ++row) {
-                        var offset = row * 4;
-                        matrix.SetRow(row, listArray[offset].MustGetValueAsFloat(),
-                                           listArray[offset + 1].MustGetValueAsFloat(),
-                                           listArray[offset + 2].MustGetValueAsFloat(),
-                                           listArray[offset + 3].MustGetValueAsFloat());
+                    for (var row = 0; row < 5; ++row) {
+                        var offset = row * 4 + 1;
+                        matrix.SetRow(row, list.GetValue(new(offset)).MustGetValueAsFloat(),
+                                           list.GetValue(new(offset + 1)).MustGetValueAsFloat(),
+                                           list.GetValue(new(offset + 2)).MustGetValueAsFloat(),
+                                           list.GetValue(new(offset + 3)).MustGetValueAsFloat());
                     }
+
                     return true;
                 default:
                     return false;
@@ -438,7 +449,7 @@ internal static partial class DreamProcNativeHelpers {
     /// It's a very BYONDish converter. Probably, you don't want to reuse it somewhere aside from the text2num implementation
     /// </remarks>
     public static double? StringToDouble(ReadOnlySpan<char> value, int radix) {
-        if (value == null || value.IsEmpty)
+        if (value.IsEmpty)
             return null;
 
         if (radix < 2 || radix > 36)

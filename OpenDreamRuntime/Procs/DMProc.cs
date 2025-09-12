@@ -954,7 +954,7 @@ public sealed class DMProcState : ProcState {
     }
 
     public DreamValue GetIndex(DreamValue indexing, DreamValue index, DMProcState state) {
-        if (indexing.TryGetValueAsDreamList(out var listObj)) {
+        if (indexing.TryGetValueAsIDreamList(out var listObj)) {
             return listObj.GetValue(index);
         }
 
@@ -1087,23 +1087,21 @@ public sealed class DMProcState : ProcState {
             case DMCallArgumentsType.FromArgumentList: {
                 if (proc == null)
                     throw new Exception("Cannot use an arglist here");
-                if (!values[0].TryGetValueAsDreamList(out var argList))
+                if (!values[0].TryGetValueAsIDreamList(out var argList))
                     return new DreamProcArguments(); // Using a non-list gives you no arguments
 
                 // new /mutable_appearance(...) always uses /image/New()'s arguments, despite any overrides
                 if (proc.OwningType == Proc.ObjectTree.MutableAppearance && proc.Name == "New")
                     proc = Proc.DreamManager.ImageConstructor;
 
-                var listValues = argList.GetValues();
-                var arguments = new DreamValue[Math.Max(listValues.Count, proc.ArgumentNames.Count)];
+                var arguments = new DreamValue[Math.Max(argList.Length, proc.ArgumentNames.Count)];
                 var skippingArg = false;
                 var isImageConstructor = proc == Proc.DreamManager.ImageConstructor ||
                                          proc == Proc.DreamManager.ImageFactoryProc;
 
                 Array.Fill(arguments, DreamValue.Null);
-                for (int i = 0; i < listValues.Count; i++) {
-                    var value = listValues[i];
-
+                int i = 0;
+                foreach (var value in argList.EnumerateValues()) {
                     if (argList.ContainsKey(value)) { //Named argument
                         if (!value.TryGetValueAsString(out var argumentName))
                             throw new Exception("List contains a non-string key, and cannot be used as an arglist");
@@ -1124,6 +1122,8 @@ public sealed class DMProcState : ProcState {
                         // TODO: Verify ordered args precede all named args
                         arguments[skippingArg ? i + 1 : i] = value;
                     }
+
+                    i++;
                 }
 
                 return new DreamProcArguments(arguments);
@@ -1164,15 +1164,12 @@ public sealed class DMProcState : ProcState {
                 return (null, arguments);
             }
             case DMCallArgumentsType.FromArgumentList: {
-                if (!values[0].TryGetValueAsDreamList(out var argList))
+                if (!values[0].TryGetValueAsIDreamList(out var argList))
                     return (Array.Empty<DreamValue>(), null); // Using a non-list gives you no arguments
 
-                var listValues = argList.GetValues();
                 var arguments = new Dictionary<DreamValue, DreamValue>();
-
-                for (int i = 0; i < listValues.Count; i++) {
-                    var value = listValues[i];
-
+                var i = 0;
+                foreach (var value in argList.EnumerateValues()) {
                     if (argList.ContainsKey(value)) { //Named argument
                         if (!value.TryGetValueAsString(out var argumentName))
                             throw new Exception("List contains a non-string key, and cannot be used as an arglist");
@@ -1182,6 +1179,8 @@ public sealed class DMProcState : ProcState {
                         // TODO: Verify ordered args precede all named args
                         arguments[new(i + 1)] = value;
                     }
+
+                    i++;
                 }
 
                 return (null, arguments);

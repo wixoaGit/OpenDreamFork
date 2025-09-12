@@ -58,15 +58,13 @@ public sealed class DreamObjectVector(DreamObjectDefinition definition) : DreamO
 
                 return;
             }
-        } else if (arg1.TryGetValueAsDreamList(out var vectorList)) { // list(X, Y) or list(X, Y, Z)
-            var components = vectorList.GetValues();
-
-            if (components.Count is 2 or 3 && components.All(v => v.Type == DreamValue.DreamValueType.Float)) {
-                X = components[0].UnsafeGetValueAsFloat();
-                Y = components[1].UnsafeGetValueAsFloat();
-                if (components.Count == 3) {
+        } else if (arg1.TryGetValueAsIDreamList(out var vectorList)) { // list(X, Y) or list(X, Y, Z)
+            if (vectorList.Length is 2 or 3 && vectorList.EnumerateValues().All(v => v.Type == DreamValue.DreamValueType.Float)) {
+                X = vectorList.GetValue(new(1)).UnsafeGetValueAsFloat();
+                Y = vectorList.GetValue(new(2)).UnsafeGetValueAsFloat();
+                if (vectorList.Length == 3) {
                     Is3D = true;
-                    Z = components[2].UnsafeGetValueAsFloat();
+                    Z = vectorList.GetValue(new(3)).UnsafeGetValueAsFloat();
                 }
 
                 return;

@@ -107,7 +107,7 @@ public class DreamObjectAtom : DreamObject {
             case "overlays": {
                 Overlays.Cut();
 
-                if (value.TryGetValueAsDreamList(out var valueList)) {
+                if (value.TryGetValueAsIDreamList(out var valueList)) {
                     // TODO: This should postpone UpdateAppearance until after everything is added
                     foreach (DreamValue overlayValue in valueList.EnumerateValues()) {
                         Overlays.AddValue(overlayValue);
@@ -121,7 +121,7 @@ public class DreamObjectAtom : DreamObject {
             case "underlays": {
                 Underlays.Cut();
 
-                if (value.TryGetValueAsDreamList(out var valueList)) {
+                if (value.TryGetValueAsIDreamList(out var valueList)) {
                     // TODO: This should postpone UpdateAppearance until after everything is added
                     foreach (DreamValue underlayValue in valueList.EnumerateValues()) {
                         Underlays.AddValue(underlayValue);
@@ -135,7 +135,7 @@ public class DreamObjectAtom : DreamObject {
             case "vis_contents": {
                 VisContents.Cut();
 
-                if (value.TryGetValueAsDreamList(out var valueList)) {
+                if (value.TryGetValueAsIDreamList(out var valueList)) {
                     // TODO: This should postpone UpdateAppearance until after everything is added
                     foreach (DreamValue visContentsValue in valueList.EnumerateValues()) {
                         VisContents.AddValue(visContentsValue);
@@ -149,7 +149,7 @@ public class DreamObjectAtom : DreamObject {
             case "filters": {
                 Filters.Cut();
 
-                if (value.TryGetValueAsDreamList(out var valueList)) { // filters = list("type"=...)
+                if (value.TryGetValueAsIDreamList(out var valueList)) { // filters = list("type"=...)
                     var filterObject = DreamObjectFilter.TryCreateFilter(ObjectTree, valueList);
                     if (filterObject == null) // list() with invalid "type" is ignored
                         break;

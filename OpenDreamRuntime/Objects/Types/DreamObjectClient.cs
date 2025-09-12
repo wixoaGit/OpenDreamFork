@@ -152,7 +152,7 @@ public sealed class DreamObjectClient : DreamObject {
             case "screen": {
                 Screen.Cut();
 
-                if (value.TryGetValueAsDreamList(out var valueList)) {
+                if (value.TryGetValueAsIDreamList(out var valueList)) {
                     foreach (DreamValue screenValue in valueList.EnumerateValues()) {
                         Screen.AddValue(screenValue);
                     }
@@ -165,7 +165,7 @@ public sealed class DreamObjectClient : DreamObject {
             case "images": {
                 Images.Cut();
 
-                if (value.TryGetValueAsDreamList(out var valueList)) {
+                if (value.TryGetValueAsIDreamList(out var valueList)) {
                     foreach (DreamValue screenValue in valueList.EnumerateValues()) {
                         Images.AddValue(screenValue);
                     }
@@ -178,7 +178,7 @@ public sealed class DreamObjectClient : DreamObject {
             case "verbs": {
                 ClientVerbs.Cut();
 
-                if (value.TryGetValueAsDreamList(out var valueList)) {
+                if (value.TryGetValueAsIDreamList(out var valueList)) {
                     foreach (DreamValue verbValue in valueList.EnumerateValues()) {
                         ClientVerbs.AddValue(verbValue);
                     }

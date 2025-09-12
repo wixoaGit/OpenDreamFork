@@ -73,8 +73,8 @@ public sealed class DreamObjectFilter(DreamObjectDefinition objectDefinition) : 
         return filterObject;
     }
 
-    public static DreamObjectFilter? TryCreateFilter(DreamObjectTree objectTree, DreamList list) {
-        static IEnumerable<(string, DreamValue)> EnumerateProperties(DreamList list) {
+    public static DreamObjectFilter? TryCreateFilter(DreamObjectTree objectTree, IDreamList list) {
+        static IEnumerable<(string, DreamValue)> EnumerateProperties(IDreamList list) {
             foreach (var key in list.EnumerateValues()) {
                 if (!key.TryGetValueAsString(out var keyStr))
                     continue;

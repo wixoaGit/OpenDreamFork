@@ -111,7 +111,7 @@ namespace OpenDreamRuntime.Procs {
                         return new DreamValueArrayEnumerator([], null);
 
                     if (dreamObject is DreamObjectAtom) {
-                        list = dreamObject.GetVariable("contents").MustGetValueAsDreamList();
+                        list = dreamObject.GetVariable("contents").MustGetValueAsIDreamList();
                     } else if (dreamObject is DreamObjectWorld) {
                         return new WorldContentsEnumerator(atomManager, filterType);
                     }
@@ -876,7 +876,7 @@ namespace OpenDreamRuntime.Procs {
 
             if (!first.IsDreamObject<DreamList>() && !first.IsNull && !second.IsNull) {
                 state.Push(new DreamValue(first.MustGetValueAsInteger() & second.MustGetValueAsInteger()));
-            } else if (first.TryGetValueAsDreamList(out var list)) {
+            } else if (first.TryGetValueAsIDreamList(out var list)) {
                 DreamList newList = state.Proc.ObjectTree.CreateList();
 
                 if (second.TryGetValueAsDreamList(out var secondList)) {
@@ -1955,14 +1955,13 @@ namespace OpenDreamRuntime.Procs {
                     gradientValues.Add(argumentValue);
                 }
             } else if (argumentInfo.Type == DMCallArgumentsType.FromArgumentList) {
-                if (!state.Pop().TryGetValueAsDreamList(out var argList))
+                if (!state.Pop().TryGetValueAsIDreamList(out var argList))
                     throw new Exception("Invalid gradient() arguments");
 
-                var argListValues = argList.GetValues();
-
-                gradientValues.EnsureCapacity(argListValues.Count - 1);
-                for (int i = 0; i < argListValues.Count; i++) {
-                    var value = argListValues[i];
+                gradientValues.EnsureCapacity(argList.Length - 1);
+                int i = -1;
+                foreach (var value in argList.EnumerateValues()) {
+                    i++;
 
                     if (value.TryGetValueAsString(out var argumentKey)) {
                         if (argumentKey == "index") {
@@ -1976,7 +1975,7 @@ namespace OpenDreamRuntime.Procs {
                         }
                     }
 
-                    if (i == argListValues.Count - 1 && gradientIndex == default) {
+                    if (i == argList.Length - 1 && gradientIndex == default) {
                         gradientIndex = value;
                         continue;
                     }
@@ -2496,7 +2495,7 @@ namespace OpenDreamRuntime.Procs {
             }
 
             Task<DreamValue> promptTask;
-            if (list.TryGetValueAsDreamList(out var valueList)) {
+            if (list.TryGetValueAsIDreamList(out var valueList)) {
                 promptTask = connection.PromptList(types, valueList, title.Stringify(), message.Stringify(), defaultValue);
             } else {
                 promptTask = connection.Prompt(types, title.Stringify(), message.Stringify(), defaultValue.Stringify());

@@ -193,7 +193,7 @@ public sealed class DreamObjectImage : DreamObject {
                 break;
             }
             case "filters": {
-                value.TryGetValueAsDreamList(out var valueList);
+                value.TryGetValueAsIDreamList(out var valueList);
 
                 _filters.Cut();
 

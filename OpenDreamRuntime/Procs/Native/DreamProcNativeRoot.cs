@@ -240,7 +240,7 @@ internal static class DreamProcNativeRoot {
                 ColorMatrix cMatrix;
                 if(color.TryGetValueAsString(out var colorStr) && Color.TryParse(colorStr, out var colorObj)){
                     cMatrix = new ColorMatrix(colorObj);
-                } else if (!color.TryGetValueAsDreamList(out var colorList) || !DreamProcNativeHelpers.TryParseColorMatrix(colorList, out cMatrix)){
+                } else if (!color.TryGetValueAsIDreamList(out var colorList) || !DreamProcNativeHelpers.TryParseColorMatrix(colorList, out cMatrix)){
                     cMatrix = ColorMatrix.Identity; //fallback to identity if invalid
                 }
 
@@ -248,7 +248,7 @@ internal static class DreamProcNativeRoot {
                 DreamValue objColor = obj.GetVariable("color");
                 if(objColor.TryGetValueAsString(out var objColorStr) && Color.TryParse(objColorStr, out var objColorObj)){
                     objCMatrix = new ColorMatrix(objColorObj);
-                } else if (!objColor.TryGetValueAsDreamList(out var objColorList) || !DreamProcNativeHelpers.TryParseColorMatrix(objColorList, out objCMatrix)){
+                } else if (!objColor.TryGetValueAsIDreamList(out var objColorList) || !DreamProcNativeHelpers.TryParseColorMatrix(objColorList, out objCMatrix)){
                     objCMatrix = ColorMatrix.Identity; //fallback to identity if invalid
                 }
 
@@ -324,7 +324,7 @@ internal static class DreamProcNativeRoot {
                 obj.SetVariableValue("color", color);
                 if(color.TryGetValueAsString(out var colorStr))
                     Color.TryParse(colorStr, out appearance.Color);
-                else if (color.TryGetValueAsDreamList(out var colorList)) {
+                else if (color.TryGetValueAsIDreamList(out var colorList)) {
                     if(DreamProcNativeHelpers.TryParseColorMatrix(colorList, out var colorMatrix))
                         appearance.ColorMatrix = colorMatrix;
                 }
@@ -546,7 +546,7 @@ internal static class DreamProcNativeRoot {
             (hVal, lVal) = (lVal, hVal);
         }
 
-        if (value.TryGetValueAsDreamList(out var list)) {
+        if (value.TryGetValueAsIDreamList(out var list)) {
             DreamList tmp = bundle.ObjectTree.CreateList();
             foreach (DreamValue val in list.EnumerateValues()) {
                 if (!val.TryGetValueAsFloat(out float floatVal))
@@ -1504,7 +1504,7 @@ internal static class DreamProcNativeRoot {
 
                     if (list.ContainsKey(listValue)) {
                         var subValue = list.GetValue(listValue);
-                        if(subValue.TryGetValueAsDreamList(out var subList) && subList is DreamListVars) //BYOND parity, do not print vars["vars"] - note that this is *not* a generic infinite loop protection on purpose
+                        if(subValue.TryGetValueAsIDreamList(out var subList) && subList is DreamListVars) //BYOND parity, do not print vars["vars"] - note that this is *not* a generic infinite loop protection on purpose
                             continue;
                         writer.WritePropertyName(key);
                         JsonEncode(writer, subValue);
@@ -1594,7 +1594,7 @@ internal static class DreamProcNativeRoot {
     public static DreamValue _length(DreamValue value, bool countBytes) {
         if (value.TryGetValueAsString(out var str)) {
             return new DreamValue(countBytes ? str.Length : str.EnumerateRunes().Count());
-        } else if (value.TryGetValueAsDreamList(out var list)) {
+        } else if (value.TryGetValueAsIDreamList(out var list)) {
             return new DreamValue(list.Length);
         } else if (value.Type is DreamValueType.Float or DreamValueType.DreamObject or DreamValueType.DreamType) {
             return new DreamValue(0);
@@ -1859,16 +1859,15 @@ internal static class DreamProcNativeRoot {
 
         if (bundle.Arguments.Length == 1) {
             DreamValue arg = bundle.GetArgument(0, "A");
-            if (!arg.TryGetValueAsDreamList(out var list))
+            if (!arg.TryGetValueAsIDreamList(out var list))
                 return arg;
 
-            var values = list.GetValues();
-            if (values.Count == 0)
+            if (list.Length == 0)
                 return DreamValue.Null;
 
-            max = values[0];
-            for (int i = 1; i < values.Count; i++) {
-                max = MaxComparison(max, values[i]);
+            max = list.GetValue(new(1));
+            for (int i = 2; i <= list.Length; i++) {
+                max = MaxComparison(max, list.GetValue(new(i)));
             }
         } else {
             if (bundle.Arguments.Length == 0)
@@ -1940,16 +1939,15 @@ internal static class DreamProcNativeRoot {
 
         if (bundle.Arguments.Length == 1) {
             DreamValue arg = bundle.GetArgument(0, "A");
-            if (!arg.TryGetValueAsDreamList(out var list))
+            if (!arg.TryGetValueAsIDreamList(out var list))
                 return arg;
 
-            var values = list.GetValues();
-            if (values.Count == 0)
+            if (list.Length == 0)
                 return DreamValue.Null;
 
-            min = values[0];
-            for (int i = 1; i < values.Count; i++) {
-                min = MinComparison(min, values[i]);
+            min = list.GetValue(new(1));
+            for (int i = 2; i <= list.Length; i++) {
+                min = MinComparison(min, list.GetValue(new(i)));
             }
         } else {
             if (bundle.Arguments.Length == 0)
@@ -2193,7 +2191,7 @@ internal static class DreamProcNativeRoot {
         DreamList rangeList = bundle.ObjectTree.CreateList(range.Height * range.Width);
         //Have to include centre
         rangeList.AddValue(new DreamValue(center));
-        if(center.TryGetVariable("contents", out var centerContents) && centerContents.TryGetValueAsDreamList(out var centerContentsList)) {
+        if(center.TryGetVariable("contents", out var centerContents) && centerContents.TryGetValueAsIDreamList(out var centerContentsList)) {
             foreach(DreamValue content in centerContentsList.EnumerateValues()) {
                 rangeList.AddValue(content);
             }
@@ -2202,7 +2200,7 @@ internal static class DreamProcNativeRoot {
         if (center is not DreamObjectTurf) { // If it's not a /turf, we have to include its loc and the loc's contents
             if(center.TryGetVariable("loc",out DreamValue centerLoc) && centerLoc.TryGetValueAsDreamObject<DreamObjectAtom>(out var centerLocObject)) {
                 rangeList.AddValue(centerLoc);
-                if(centerLocObject.GetVariable("contents").TryGetValueAsDreamList(out var locContentsList)) {
+                if(centerLocObject.GetVariable("contents").TryGetValueAsIDreamList(out var locContentsList)) {
                     foreach (DreamValue content in locContentsList.EnumerateValues()) {
                         rangeList.AddValue(content);
                     }
@@ -2839,7 +2837,7 @@ internal static class DreamProcNativeRoot {
     }
 
     private static void OutputToStatPanel(DreamManager dreamManager, DreamConnection connection, DreamValue name, DreamValue value) {
-        if (name.IsNull && value.TryGetValueAsDreamList(out var list)) {
+        if (name.IsNull && value.TryGetValueAsIDreamList(out var list)) {
             foreach (var item in list.EnumerateValues())
                 OutputToStatPanel(dreamManager, connection, name, item);
         } else {
@@ -3403,7 +3401,7 @@ internal static class DreamProcNativeRoot {
         if (center is null)
             return new(view);
 
-        if (center.TryGetVariable("contents", out var centerContents) && centerContents.TryGetValueAsDreamList(out var centerContentsList)) {
+        if (center.TryGetVariable("contents", out var centerContents) && centerContents.TryGetValueAsIDreamList(out var centerContentsList)) {
             foreach (var item in centerContentsList.EnumerateValues()) {
                 view.AddValue(item);
             }
