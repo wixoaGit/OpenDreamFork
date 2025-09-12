@@ -342,7 +342,7 @@ public static unsafe partial class ByondApi {
         return RunOnMainThread<byte>(() => {
             try {
                 DreamValue dstValue = ValueFromDreamApi(*loc);
-                if (!dstValue.TryGetValueAsDreamList(out DreamList? dstListValue)) {
+                if (!dstValue.TryGetValueAsIDreamList(out var dstListValue)) {
                     return 0;
                 }
 
@@ -377,13 +377,12 @@ public static unsafe partial class ByondApi {
 
         return RunOnMainThread<byte>(() => {
             DreamValue srcValue = ValueFromDreamApi(*loc);
-            if (!srcValue.TryGetValueAsDreamList(out var srcList)) {
+            if (!srcValue.TryGetValueAsIDreamList(out var srcList)) {
                 *len = 0;
                 return 0;
             }
 
-            var srcDreamVals = srcList.GetAssociativeValues();
-            int length = srcDreamVals.Count * 2;
+            int length = srcList.Length * 2;
             *len = (uint)length;
             if (list == null || providedBufLen < length) {
                 return 0;
@@ -391,7 +390,7 @@ public static unsafe partial class ByondApi {
 
             try {
                 int i = 0;
-                foreach (var entry in srcDreamVals) {
+                foreach (var entry in srcList.EnumerateAssocValues()) {
                     list[i] = ValueToByondApi(entry.Key);
                     list[i + 1] = ValueToByondApi(entry.Value);
                     i += 2;
@@ -422,7 +421,7 @@ public static unsafe partial class ByondApi {
             try {
                 DreamValue idx = ValueFromDreamApi(*cIdx);
                 DreamValue listValue = ValueFromDreamApi(*loc);
-                if (!listValue.TryGetValueAsDreamList(out var srcList)) {
+                if (!listValue.TryGetValueAsIDreamList(out var srcList)) {
                     return 0;
                 }
 
@@ -454,7 +453,7 @@ public static unsafe partial class ByondApi {
             try {
                 DreamValue idx = ValueFromDreamApi(*cIdx);
                 DreamValue listValue = ValueFromDreamApi(*loc);
-                if (!listValue.TryGetValueAsDreamList(out var dstList)) {
+                if (!listValue.TryGetValueAsIDreamList(out var dstList)) {
                     return 0;
                 }
 

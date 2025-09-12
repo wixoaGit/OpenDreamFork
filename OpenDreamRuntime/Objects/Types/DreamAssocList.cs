@@ -11,6 +11,10 @@ public sealed class DreamAssocList(DreamObjectDefinition aListDef, int size) : D
         _values[key] = value;
     }
 
+    public void AddValue(DreamValue value) {
+        _values.TryAdd(value, DreamValue.Null);
+    }
+
     public DreamValue GetValue(DreamValue key) {
         if (!_values.TryGetValue(key, out var value))
             throw new Exception($"No value with the key {key}");
@@ -28,6 +32,13 @@ public sealed class DreamAssocList(DreamObjectDefinition aListDef, int size) : D
 
     public IEnumerable<KeyValuePair<DreamValue, DreamValue>> EnumerateAssocValues() {
         return _values;
+    }
+
+    public void Cut(int start = 1, int end = 0) {
+        if (start != 1 && end != 0)
+            throw new ArgumentException("Assoc lists cannot be cut by index");
+
+        _values.Clear();
     }
 
     public DreamValue[] CopyToArray() {
