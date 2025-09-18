@@ -2213,7 +2213,7 @@ namespace OpenDreamRuntime.Procs {
                 if (values.Length == 0)
                     throw new Exception("pick() from empty list");
 
-                var index = state.DreamManager.Random.Next(0, values.Length);
+                var index = state.DreamManager.Random.Next(1, values.Length+1);
                 picked = values.GetValue(new(index));
             } else {
                 int pickedIndex = state.DreamManager.Random.Next(0, count);

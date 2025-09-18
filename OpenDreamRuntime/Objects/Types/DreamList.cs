@@ -8,6 +8,7 @@ using OpenDreamShared.Dream;
 using Robust.Server.GameStates;
 using Robust.Shared.Collections;
 using Robust.Shared.Serialization.Manager;
+using DMCompiler.Compiler;
 using Dependency = Robust.Shared.IoC.DependencyAttribute;
 
 namespace OpenDreamRuntime.Objects.Types;
@@ -265,7 +266,7 @@ public class DreamList : DreamObject, IDreamList {
             }
         } else {
             if (size < 0) {
-                DreamManager.OptionalException<InvalidOperationException>(DMCompiler.Compiler.WarningCode.ListNegativeSizeException, "Setting a list size to a negative value is invalid");
+                DreamManager.OptionalException<InvalidOperationException>(WarningCode.ListNegativeSizeException, "Setting a list size to a negative value is invalid");
             }
 
             Cut(size + 1);
@@ -328,10 +329,8 @@ public class DreamList : DreamObject, IDreamList {
             foreach (DreamValue value in bList.EnumerateValues()) {
                 listCopy.AddValue(value);
 
-                var assocValue = bList.GetValue(value);
-                if (assocValue != DreamValue.Null) {
-                    listCopy.SetValue(value, assocValue);
-                }
+                if (bList.HasAssociatedValue(value))
+                    listCopy.SetValue(value, bList.GetValue(value));
             }
         } else {
             listCopy.AddValue(b);
@@ -362,7 +361,9 @@ public class DreamList : DreamObject, IDreamList {
                 if (list.ContainsValue(value))
                     continue;
 
-                list.SetValue(value, bList.GetValue(value));
+                list.AddValue(value);
+                if (bList.HasAssociatedValue(value))
+                    list.SetValue(value, bList.GetValue(value));
             }
         } else if (!list.ContainsValue(b)) { // List | x
             list.AddValue(b);
@@ -412,8 +413,9 @@ public class DreamList : DreamObject, IDreamList {
                 if (ContainsValue(value))
                     continue;
 
-                var associatedValue = bList.GetValue(value);
-                SetValue(value, associatedValue);
+                AddValue(value);
+                if (bList.HasAssociatedValue(value))
+                    SetValue(value, bList.GetValue(value));
             }
         } else if (!ContainsValue(b)) {
             AddValue(b);

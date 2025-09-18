@@ -2088,7 +2088,7 @@ internal static class DreamProcNativeRoot {
         StringBuilder paramBuilder = new StringBuilder();
 
         foreach (DreamValue entry in list.EnumerateValues()) {
-            if (list.ContainsValue(entry)) {
+            if (list.HasAssociatedValue(entry)) {
                 paramBuilder.Append(
                     $"{HttpUtility.UrlEncode(entry.Stringify())}={HttpUtility.UrlEncode(list.GetValue(entry).Stringify())}");
             } else {

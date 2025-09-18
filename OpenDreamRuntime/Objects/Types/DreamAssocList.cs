@@ -39,7 +39,7 @@ public sealed class DreamAssocList : DreamObject, IDreamList {
     }
 
     public bool HasAssociatedValue(DreamValue key) {
-        return ContainsValue(key);
+        return ContainsValue(key); // Every value has an associated value
     }
 
     public IEnumerable<DreamValue> EnumerateValues() {

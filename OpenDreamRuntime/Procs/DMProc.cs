@@ -1102,7 +1102,7 @@ public sealed class DMProcState : ProcState {
                 Array.Fill(arguments, DreamValue.Null);
                 int i = 0;
                 foreach (var value in argList.EnumerateValues()) {
-                    if (argList.ContainsValue(value)) { //Named argument
+                    if (argList.HasAssociatedValue(value)) { //Named argument
                         if (!value.TryGetValueAsString(out var argumentName))
                             throw new Exception("List contains a non-string key, and cannot be used as an arglist");
 
@@ -1170,7 +1170,7 @@ public sealed class DMProcState : ProcState {
                 var arguments = new Dictionary<DreamValue, DreamValue>();
                 var i = 0;
                 foreach (var value in argList.EnumerateValues()) {
-                    if (argList.ContainsValue(value)) { //Named argument
+                    if (argList.HasAssociatedValue(value)) { //Named argument
                         if (!value.TryGetValueAsString(out var argumentName))
                             throw new Exception("List contains a non-string key, and cannot be used as an arglist");
 
