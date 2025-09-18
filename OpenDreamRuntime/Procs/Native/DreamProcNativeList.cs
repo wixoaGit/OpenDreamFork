@@ -31,9 +31,9 @@ internal static class DreamProcNativeList {
         int start = bundle.GetArgument(0, "Start").MustGetValueAsInteger(); //1-indexed
         int end = bundle.GetArgument(1, "End").MustGetValueAsInteger(); //1-indexed
         DreamList list = (DreamList)src!;
-        DreamList listCopy = list.CreateCopy(start, end);
+        IDreamList listCopy = list.CreateCopy(start, end);
 
-        return new DreamValue(listCopy);
+        return new DreamValue((DreamObject)listCopy);
     }
 
     [DreamProc("Cut")]

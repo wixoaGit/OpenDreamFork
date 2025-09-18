@@ -277,20 +277,6 @@ public struct DreamValue : IEquatable<DreamValue> {
         return false;
     }
 
-    public readonly bool TryGetValueAsDreamList([NotNullWhen(true)] out DreamList? list) {
-        return TryGetValueAsDreamObject(out list);
-    }
-
-    public DreamList MustGetValueAsDreamList() {
-        if (_refValue is not DreamList dl) {
-            ThrowInvalidCastList();
-            return null!;
-        }
-
-        return dl;
-    }
-
-    // TODO: Replace GetValueAsDreamList with GetValueAsIDreamList if possible. IDreamList isn't complete enough yet.
     public readonly bool TryGetValueAsIDreamList([NotNullWhen(true)] out IDreamList? list) {
         if (_refValue is IDreamList idl) {
             list = idl;

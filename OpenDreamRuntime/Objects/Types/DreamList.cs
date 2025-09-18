@@ -6,6 +6,7 @@ using OpenDreamRuntime.Procs;
 using OpenDreamRuntime.Rendering;
 using OpenDreamShared.Dream;
 using Robust.Server.GameStates;
+using Robust.Shared.Collections;
 using Robust.Shared.Serialization.Manager;
 using Dependency = Robust.Shared.IoC.DependencyAttribute;
 
@@ -105,14 +106,14 @@ public class DreamList : DreamObject, IDreamList {
         base.HandleDeletion(possiblyThreaded);
     }
 
-    public DreamList CreateCopy(int start = 1, int end = 0) {
+    public IDreamList CreateCopy(int start = 1, int end = 0) {
         if (start == 0) ++start; //start being 0 and start being 1 are equivalent
 
         var values = GetValues();
         if (end > values.Count + 1 || start > values.Count + 1) throw new Exception("list index out of bounds");
         if (end == 0) end = values.Count + 1;
         if (end <= start)
-            return new(ObjectDefinition, 0);
+            return new DreamList(ObjectDefinition, 0);
 
         List<DreamValue> copyValues = values.GetRange(start - 1, end - start);
 
@@ -125,7 +126,7 @@ public class DreamList : DreamObject, IDreamList {
             }
         }
 
-        return new(ObjectDefinition, copyValues, associativeValues);
+        return new DreamList(ObjectDefinition, copyValues, associativeValues);
     }
 
     /// <summary>
@@ -137,11 +138,17 @@ public class DreamList : DreamObject, IDreamList {
     }
 
     public virtual IEnumerable<DreamValue> EnumerateValues() {
-        return _values;
+        ValueList<DreamValue> enumerating = new(_values);
+
+        foreach (var value in enumerating) {
+            yield return value;
+        }
     }
 
     public IEnumerable<KeyValuePair<DreamValue, DreamValue>> EnumerateAssocValues() {
-        foreach (var value in _values) {
+        ValueList<DreamValue> enumerating = new(_values);
+
+        foreach (var value in EnumerateValues()) {
             if (_associativeValues?.TryGetValue(value, out var associativeValue) is true) {
                 yield return new(value, associativeValue);
             } else {
@@ -155,10 +162,6 @@ public class DreamList : DreamObject, IDreamList {
             return new();
 
         return new(_associativeValues);
-    }
-
-    public Dictionary<DreamValue, DreamValue> GetAssociativeValues() {
-        return _associativeValues ??= new Dictionary<DreamValue, DreamValue>();
     }
 
     public virtual DreamValue GetValue(DreamValue key) {
@@ -180,10 +183,14 @@ public class DreamList : DreamObject, IDreamList {
                 _values[keyInteger - 1] = value;
             }
         } else {
-            if (!ContainsValue(key)) _values.Add(key);
+            if (!ContainsValue(key))
+                _values.Add(key);
 
             _associativeValues ??= new Dictionary<DreamValue, DreamValue>(1);
-            _associativeValues[key] = value;
+            if (value != DreamValue.Null)
+                _associativeValues[key] = value;
+            else
+                _associativeValues.Remove(key);
         }
 
         UpdateTracyContentsMemory();
@@ -205,18 +212,12 @@ public class DreamList : DreamObject, IDreamList {
         UpdateTracyContentsMemory();
     }
 
-    //Does not include associations
     public virtual bool ContainsValue(DreamValue value) {
-        for (int i = 0; i < _values.Count; i++) {
-            if (_values[i].Equals(value))
-                return true;
-        }
-
-        return false;
+        return _values.Contains(value);
     }
 
-    public virtual bool ContainsKey(DreamValue value) {
-        return _associativeValues != null && _associativeValues.ContainsKey(value);
+    public bool HasAssociatedValue(DreamValue key) {
+        return _associativeValues?.ContainsKey(key) is true;
     }
 
     public virtual int FindValue(DreamValue value, int start = 1, int end = 0) {
@@ -273,15 +274,6 @@ public class DreamList : DreamObject, IDreamList {
         UpdateTracyContentsMemory();
     }
 
-    public DreamList Union(DreamList other) {
-        DreamList newList = new DreamList(ObjectDefinition, _values.Union(other.GetValues()).ToList(), null);
-        foreach ((DreamValue key, DreamValue value) in other.GetAssociativeValues()) {
-            newList.SetValue(key, value);
-        }
-
-        return newList;
-    }
-
     public override string ToString() {
         string assoc = IsAssociative ? ", assoc" : "";
         return $"/list{{len={Length}{assoc}}}";
@@ -330,27 +322,28 @@ public class DreamList : DreamObject, IDreamList {
     }
 
     public override DreamValue OperatorAdd(DreamValue b, DMProcState state) {
-        DreamList listCopy = CreateCopy();
+        var listCopy = CreateCopy();
 
-        if (b.TryGetValueAsDreamList(out var bList)) {
+        if (b.TryGetValueAsIDreamList(out var bList)) {
             foreach (DreamValue value in bList.EnumerateValues()) {
-                if (bList._associativeValues?.TryGetValue(value, out var assocValue) is true) {
+                listCopy.AddValue(value);
+
+                var assocValue = bList.GetValue(value);
+                if (assocValue != DreamValue.Null) {
                     listCopy.SetValue(value, assocValue);
-                } else {
-                    listCopy.AddValue(value);
                 }
             }
         } else {
             listCopy.AddValue(b);
         }
 
-        return new DreamValue(listCopy);
+        return new DreamValue((DreamObject)listCopy);
     }
 
     public override DreamValue OperatorSubtract(DreamValue b, DMProcState state) {
-        DreamList listCopy = CreateCopy();
+        var listCopy = CreateCopy();
 
-        if (b.TryGetValueAsDreamList(out var bList)) {
+        if (b.TryGetValueAsIDreamList(out var bList)) {
             foreach (DreamValue value in bList.EnumerateValues()) {
                 listCopy.RemoveValue(value);
             }
@@ -358,30 +351,34 @@ public class DreamList : DreamObject, IDreamList {
             listCopy.RemoveValue(b);
         }
 
-        return new DreamValue(listCopy);
+        return new DreamValue((DreamObject)listCopy);
     }
 
     public override DreamValue OperatorOr(DreamValue b, DMProcState state) {
-        DreamList list;
+        var list = CreateCopy();
 
-        if (b.TryGetValueAsDreamList(out var bList)) {  // List | List
-            list = Union(bList);
-        } else {                                        // List | x
-            list = CreateCopy();
+        if (b.TryGetValueAsIDreamList(out var bList)) { // List | List
+            foreach (var value in bList.EnumerateValues()) {
+                if (list.ContainsValue(value))
+                    continue;
+
+                list.SetValue(value, bList.GetValue(value));
+            }
+        } else if (!list.ContainsValue(b)) { // List | x
             list.AddValue(b);
         }
 
-        return new DreamValue(list);
+        return new DreamValue((DreamObject)list);
     }
 
     public override DreamValue OperatorAppend(DreamValue b) {
-        if (b.TryGetValueAsDreamList(out var bList)) {
-            var values = bList.GetValues();
-            var valueCount = values.Count; // Some lists return a reference to their internal values list which could change with each loop
-            for (int i = 0; i < valueCount; i++) {
-                var value = values[i];
+        if (b.TryGetValueAsIDreamList(out var bList)) {
+            foreach (var value in bList.EnumerateValues()) {
                 AddValue(value); // Always add the value
-                if (bList._associativeValues?.TryGetValue(value, out var assocValue) is true) { // Ensure the associated value is correct
+
+                if (bList.HasAssociatedValue(value)) {
+                    var assocValue = bList.GetValue(value);
+
                     _associativeValues ??= new();
                     _associativeValues[value] = assocValue;
                 }
@@ -394,11 +391,13 @@ public class DreamList : DreamObject, IDreamList {
     }
 
     public override DreamValue OperatorRemove(DreamValue b) {
-        if (b.TryGetValueAsDreamList(out var bList)) {
-            DreamValue[] values = bList.GetValues().ToArray();
-
-            foreach (DreamValue value in values) {
-                RemoveValue(value);
+        if (b.TryGetValueAsIDreamList(out var bList)) {
+            if (bList == this) {
+                Cut();
+            } else {
+                foreach (DreamValue value in bList.EnumerateValues()) {
+                    RemoveValue(value);
+                }
             }
         } else {
             RemoveValue(b);
@@ -408,15 +407,13 @@ public class DreamList : DreamObject, IDreamList {
     }
 
     public override DreamValue OperatorCombine(DreamValue b) {
-        if (b.TryGetValueAsDreamList(out var bList)) {
+        if (b.TryGetValueAsIDreamList(out var bList)) {
             foreach (DreamValue value in bList.EnumerateValues()) {
                 if (ContainsValue(value))
                     continue;
 
-                if (bList._associativeValues?.TryGetValue(value, out var associatedValue) is true)
-                    SetValue(value, associatedValue);
-                else
-                    AddValue(value);
+                var associatedValue = bList.GetValue(value);
+                SetValue(value, associatedValue);
             }
         } else if (!ContainsValue(b)) {
             AddValue(b);
@@ -426,7 +423,7 @@ public class DreamList : DreamObject, IDreamList {
     }
 
     public override DreamValue OperatorMask(DreamValue b) {
-        if (b.TryGetValueAsDreamList(out var bList)) {
+        if (b.TryGetValueAsIDreamList(out var bList)) {
             for (int i = 1; i <= Length; i++) {
                 if (!bList.ContainsValue(GetValue(new DreamValue(i)))) {
                     Cut(i, i + 1);
@@ -446,27 +443,21 @@ public class DreamList : DreamObject, IDreamList {
     }
 
     public override DreamValue OperatorEquivalent(DreamValue b) {
-        if (!b.TryGetValueAsDreamList(out var secondList))
+        if (!b.TryGetValueAsIDreamList(out var secondList))
             return DreamValue.False;
-        if (Length != secondList.Length)
+        if (Length != secondList.Length || IsAssociative != secondList.IsAssociative)
             return DreamValue.False;
 
-        var firstValues = GetValues();
-        var secondValues = secondList.GetValues();
+        using var firstEnumerator = EnumerateValues().GetEnumerator();
+        using var secondEnumerator = secondList.EnumerateValues().GetEnumerator();
 
-        var firstListAssoc = GetAssociativeValues();
-        var secondListAssoc = secondList.GetAssociativeValues();
+        while (firstEnumerator.MoveNext()) {
+            secondEnumerator.MoveNext();
 
-        for (var i = 0; i < firstValues.Count; i++) {
-            // Starting with 516, equivalence checks assoc values
-            if (IsAssociative || secondList.IsAssociative) {
-                if(!firstListAssoc.TryGetValue(firstValues[i], out var firstAssocVal)) firstAssocVal = DreamValue.Null;
-                if(!secondListAssoc.TryGetValue(firstValues[i], out var secondAssocVal)) secondAssocVal = DreamValue.Null;
-                if (!firstAssocVal.Equals(secondAssocVal))
-                    return DreamValue.False;
-            }
-
-            if (!firstValues[i].Equals(secondValues[i]))
+            var first = firstEnumerator.Current;
+            if (!first.Equals(secondEnumerator.Current))
+                return DreamValue.False;
+            if (IsAssociative && first.Type != DreamValue.DreamValueType.Float && GetValue(first) != secondList.GetValue(first))
                 return DreamValue.False;
         }
 
@@ -494,16 +485,12 @@ internal sealed class DreamListVars(DreamObjectDefinition listDef, DreamObject d
         return DreamObject.GetVariableNames().Concat(DreamObject.ObjectDefinition.GlobalVariables.Keys).Select(name => new DreamValue(name));
     }
 
-    public override bool ContainsKey(DreamValue value) {
+    public override bool ContainsValue(DreamValue value) {
         if (!value.TryGetValueAsString(out var varName)) {
             return false;
         }
 
         return DreamObject.HasVariable(varName);
-    }
-
-    public override bool ContainsValue(DreamValue value) {
-        return ContainsKey(value);
     }
 
     public override DreamValue GetValue(DreamValue key) {
@@ -566,16 +553,12 @@ internal sealed class DreamGlobalVars : DreamList {
         }
     }
 
-    public override bool ContainsKey(DreamValue value) {
+    public override bool ContainsValue(DreamValue value) {
         if (!value.TryGetValueAsString(out var varName)) {
             return false;
         }
 
         return _objectTree.Root.ObjectDefinition.GlobalVariables.ContainsKey(varName);
-    }
-
-    public override bool ContainsValue(DreamValue value) {
-        return ContainsKey(value);
     }
 
     public override DreamValue GetValue(DreamValue key) {

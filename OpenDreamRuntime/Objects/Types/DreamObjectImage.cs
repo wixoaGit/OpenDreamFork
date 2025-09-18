@@ -9,9 +9,9 @@ public sealed class DreamObjectImage : DreamObject {
     public EntityUid Entity = EntityUid.Invalid;
     public readonly DMISpriteComponent? SpriteComponent;
     private DreamObject? _loc;
-    private DreamList _overlays;
-    private DreamList _underlays;
-    private readonly DreamList _filters;
+    private IDreamList _overlays;
+    private IDreamList _underlays;
+    private readonly IDreamList _filters;
     public readonly bool IsMutableAppearance;
     public MutableAppearance? MutableAppearance;
 
@@ -89,13 +89,13 @@ public sealed class DreamObjectImage : DreamObject {
                 return true;
             }
             case "overlays":
-                value = new(_overlays);
+                value = new((DreamObject)_overlays);
                 return true;
             case "underlays":
-                value = new(_underlays);
+                value = new((DreamObject)_underlays);
                 return true;
             case "filters":
-                value = new(_filters);
+                value = new((DreamObject)_filters);
                 return true;
             default: {
                 if (AtomManager.IsValidAppearanceVar(varName)) {
@@ -124,7 +124,7 @@ public sealed class DreamObjectImage : DreamObject {
                 value.TryGetValueAsDreamObject(out _loc);
                 break;
             case "overlays": {
-                value.TryGetValueAsDreamList(out var valueList);
+                value.TryGetValueAsIDreamList(out var valueList);
 
                 // /mutable_appearance has some special behavior for its overlays and underlays vars
                 // They're normal lists, not the special DreamOverlaysList.
@@ -160,7 +160,7 @@ public sealed class DreamObjectImage : DreamObject {
                 break;
             }
             case "underlays": {
-                value.TryGetValueAsDreamList(out var valueList);
+                value.TryGetValueAsIDreamList(out var valueList);
 
                 // See the comment in the overlays setter for info on this
                 if (ObjectDefinition.IsSubtypeOf(ObjectTree.MutableAppearance)) {
@@ -228,8 +228,8 @@ public sealed class DreamObjectImage : DreamObject {
         }
     }
 
-    public DreamObject? GetAttachedLoc(){
-        return this._loc;
+    public DreamObject? GetAttachedLoc() {
+        return _loc;
     }
 
     protected override void HandleDeletion(bool possiblyThreaded) {

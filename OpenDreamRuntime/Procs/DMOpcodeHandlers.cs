@@ -679,14 +679,15 @@ namespace OpenDreamRuntime.Procs {
             DreamValue value = state.Pop();
 
             if (listValue.TryGetValueAsDreamObject(out var listObject) && listObject != null) {
-                DreamList? list = listObject as DreamList;
+                var list = listObject as IDreamList;
 
                 if (list == null) {
                     if (listObject is DreamObjectAtom or DreamObjectWorld) {
-                        list = listObject.GetVariable("contents").MustGetValueAsDreamList();
+                        list = listObject.GetVariable("contents").MustGetValueAsIDreamList();
                     } else {
                         // BYOND ignores all floats, strings, types, etc. here and just returns 0.
                         state.Push(DreamValue.False);
+                        return ProcStatus.Continue;
                     }
                 }
 
@@ -879,7 +880,7 @@ namespace OpenDreamRuntime.Procs {
             } else if (first.TryGetValueAsIDreamList(out var list)) {
                 DreamList newList = state.Proc.ObjectTree.CreateList();
 
-                if (second.TryGetValueAsDreamList(out var secondList)) {
+                if (second.TryGetValueAsIDreamList(out var secondList)) {
                     int len = list.Length;
 
                     for (int i = 1; i <= len; i++) {
@@ -889,7 +890,8 @@ namespace OpenDreamRuntime.Procs {
                             DreamValue associativeValue = list.GetValue(value);
 
                             newList.AddValue(value);
-                            if (!associativeValue.IsNull) newList.SetValue(value, associativeValue);
+                            if (!associativeValue.IsNull)
+                                newList.SetValue(value, associativeValue);
                         }
                     }
                 } else {
@@ -2116,20 +2118,21 @@ namespace OpenDreamRuntime.Procs {
                 return ProcStatus.Continue;
             }
 
-            DreamList? containerList;
+            IDreamList? containerList;
             if (container is DreamObjectAtom) {
-                container.GetVariable("contents").TryGetValueAsDreamList(out containerList);
+                container.GetVariable("contents").TryGetValueAsIDreamList(out containerList);
             } else {
                 containerList = container as DreamList;
             }
 
             if (value.TryGetValueAsString(out var refString)) {
                 var refValue = state.DreamManager.LocateRef(refString);
-                if(container is not DreamObjectWorld && containerList is not null) { //if it's a valid ref, it's in world, we don't need to check
+                if (container is not DreamObjectWorld && containerList is not null) { //if it's a valid ref, it's in world, we don't need to check
                     state.Push(containerList.ContainsValue(refValue) ? refValue : DreamValue.Null);
                     return ProcStatus.Continue;
-                } else
+                } else {
                     state.Push(refValue);
+                }
             } else if (value.TryGetValueAsType(out var ancestor)) {
                 if (containerList == null) {
                     state.Push(DreamValue.Null);
@@ -2137,7 +2140,7 @@ namespace OpenDreamRuntime.Procs {
                     return ProcStatus.Continue;
                 }
 
-                foreach (DreamValue containerItem in containerList.GetValues()) {
+                foreach (DreamValue containerItem in containerList.EnumerateValues()) {
                     DreamObjectDefinition itemDef;
                     if (containerItem.TryGetValueAsType(out var type)) {
                         itemDef = type.ObjectDefinition;
@@ -2163,7 +2166,6 @@ namespace OpenDreamRuntime.Procs {
                 }
 
                 state.Push(containerList.ContainsValue(value) ? value : DreamValue.Null);
-                return ProcStatus.Continue;
             }
 
             return ProcStatus.Continue;
@@ -2203,18 +2205,16 @@ namespace OpenDreamRuntime.Procs {
             if (count == 1) {
                 DreamValue value = state.Pop();
 
-                List<DreamValue> values;
-                if (value.TryGetValueAsDreamList(out var list)) {
-                    values = list.GetValues();
-                } else {
+                if (!value.TryGetValueAsIDreamList(out var values)) {
                     state.Push(value);
                     return ProcStatus.Continue;
                 }
 
-                if (values.Count == 0)
+                if (values.Length == 0)
                     throw new Exception("pick() from empty list");
 
-                picked = values[state.DreamManager.Random.Next(0, values.Count)];
+                var index = state.DreamManager.Random.Next(0, values.Length);
+                picked = values.GetValue(new(index));
             } else {
                 int pickedIndex = state.DreamManager.Random.Next(0, count);
 
@@ -2765,29 +2765,29 @@ namespace OpenDreamRuntime.Procs {
         }
 
         private static DreamValue BitXorValues(DreamObjectTree objectTree, DreamValue first, DreamValue second) {
-            if (first.TryGetValueAsDreamList(out var list)) {
-                DreamList newList = objectTree.CreateList();
-                List<DreamValue> values;
+            if (first.TryGetValueAsIDreamList(out var list)) {
+                IDreamList newList = objectTree.CreateList();
+                IEnumerable<DreamValue> values;
 
-                if (second.TryGetValueAsDreamList(out DreamList secondList)) {
-                    values = secondList.GetValues();
+                if (second.TryGetValueAsIDreamList(out var secondList)) {
+                    values = secondList.EnumerateValues();
                 } else {
-                    values = new List<DreamValue>() { second };
+                    values = [ second ];
                 }
 
                 foreach (DreamValue value in values) {
                     bool inFirstList = list.ContainsValue(value);
-                    bool inSecondList = secondList.ContainsValue(value);
 
-                    if (inFirstList ^ inSecondList) {
+                    if (inFirstList ^ true) {
                         newList.AddValue(value);
 
                         DreamValue associatedValue = inFirstList ? list.GetValue(value) : secondList.GetValue(value);
-                        if (!associatedValue.IsNull) newList.SetValue(value, associatedValue);
+                        if (!associatedValue.IsNull)
+                            newList.SetValue(value, associatedValue);
                     }
                 }
 
-                return new DreamValue(newList);
+                return new DreamValue((DreamObject)newList);
             }
 
             switch (first.Type) {
@@ -2828,10 +2828,10 @@ namespace OpenDreamRuntime.Procs {
 
         private static DreamValue CalculateGradient(List<DreamValue> gradientValues, DreamValue colorSpaceValue, DreamValue indexValue) {
             if (gradientValues.Count == 1) {
-                if (!gradientValues[0].TryGetValueAsDreamList(out var gradientList))
+                if (!gradientValues[0].TryGetValueAsIDreamList(out var gradientList))
                     throw new Exception("Invalid gradient() values; expected either a list or at least 2 values");
 
-                gradientValues = gradientList.GetValues();
+                gradientValues = gradientList.CopyToArray().ToList();
             }
 
             if (!indexValue.TryGetValueAsFloat(out float index))
