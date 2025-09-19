@@ -5,6 +5,8 @@ public sealed class DreamAssocList : DreamObject, IDreamList {
     public bool IsAssociative => true;
     public int Length => _values.Count;
 
+    bool IDreamList.IsIndexableByNumber => false;
+
     private readonly Dictionary<DreamValue, DreamValue> _values;
 
     public DreamAssocList(DreamObjectDefinition aListDef, int size) : base(aListDef) {

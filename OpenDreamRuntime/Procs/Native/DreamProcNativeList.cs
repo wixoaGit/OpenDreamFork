@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using System.Linq;
+using System.Text;
 using OpenDreamRuntime.Objects;
 using OpenDreamRuntime.Objects.Types;
 using DreamValueTypeFlag = OpenDreamRuntime.DreamValue.DreamValueTypeFlag;
@@ -57,7 +58,7 @@ internal static class DreamProcNativeList {
         if (!bundle.GetArgument(1, "Start").TryGetValueAsInteger(out var start)) //1-indexed
             start = 1; // 1 if non-number
         bundle.GetArgument(2, "End").TryGetValueAsInteger(out var end); //1-indexed, 0 if non-number
-        DreamList list = (DreamList)src!;
+        IDreamList list = (IDreamList)src!;
 
         return new(list.FindValue(element, start, end));
     }
@@ -93,7 +94,6 @@ internal static class DreamProcNativeList {
     [DreamProcParameter("End", Type = DreamValueTypeFlag.Float, DefaultValue = 0)]
     public static DreamValue NativeProc_Join(NativeProc.Bundle bundle, DreamObject? src, DreamObject? usr) {
         DreamList list = (DreamList)src!;
-        List<DreamValue> values = list.GetValues();
 
         bundle.GetArgument(0, "Glue").TryGetValueAsString(out var glue);
         if (!bundle.GetArgument(1, "Start").TryGetValueAsInteger(out var start))
@@ -102,18 +102,19 @@ internal static class DreamProcNativeList {
 
         // Negative wrap-around
         if (end <= 0)
-            end += values.Count + 1;
+            end += list.Length + 1;
         if (start < 0)
-            start += values.Count + 1;
+            start += list.Length + 1;
 
         if (start == 0 || start >= end)
             return new(string.Empty);
 
         StringBuilder result = new(end - start);
-        for (int i = start; i < end; i++) {
-            result.Append(values[i - 1].Stringify());
+        int count = 0;
+        foreach (var value in list.EnumerateValues().Skip(start)) {
+            result.Append(value.Stringify());
 
-            if (i != end - 1)
+            if (count++ != end - 1)
                 result.Append(glue);
         }
 
