@@ -233,12 +233,7 @@ public class DreamList : DreamObject, IDreamList {
 
     //Does not include associations
     public virtual bool ContainsValue(DreamValue value) {
-        for (int i = 0; i < _values.Count; i++) {
-            if (_values[i].Equals(value))
-                return true;
-        }
-
-        return false;
+        return _values.Contains(value);
     }
 
     public virtual bool ContainsKey(DreamValue value) {
@@ -248,11 +243,7 @@ public class DreamList : DreamObject, IDreamList {
     public virtual int FindValue(DreamValue value, int start = 1, int end = 0) {
         if (end == 0 || end > _values.Count) end = _values.Count + 1;
 
-        for (int i = start; i < end; i++) {
-            if (_values[i - 1].Equals(value)) return i;
-        }
-
-        return 0;
+        return _values.IndexOf(value, start - 1, end - start) + 1;
     }
 
     public virtual void Cut(int start = 1, int end = 0) {
@@ -513,17 +504,18 @@ public class DreamList : DreamObject, IDreamList {
         var firstListAssoc = GetAssociativeValues();
         var secondListAssoc = secondList.GetAssociativeValues();
 
-        for (var i = 0; i < firstValues.Count; i++) {
-            // Starting with 516, equivalence checks assoc values
-            if (IsAssociative || secondList.IsAssociative) {
-                if(!firstListAssoc.TryGetValue(firstValues[i], out var firstAssocVal)) firstAssocVal = DreamValue.Null;
-                if(!secondListAssoc.TryGetValue(firstValues[i], out var secondAssocVal)) secondAssocVal = DreamValue.Null;
+        if (!firstValues.SequenceEqual(secondValues))
+            return DreamValue.False;
+        if (IsAssociative || secondList.IsAssociative) {
+            foreach (var value in firstValues) {
+                if (!firstListAssoc.TryGetValue(value, out var firstAssocVal))
+                    firstAssocVal = DreamValue.Null;
+                if (!secondListAssoc.TryGetValue(value, out var secondAssocVal))
+                    secondAssocVal = DreamValue.Null;
+
                 if (!firstAssocVal.Equals(secondAssocVal))
                     return DreamValue.False;
             }
-
-            if (!firstValues[i].Equals(secondValues[i]))
-                return DreamValue.False;
         }
 
         return DreamValue.True;

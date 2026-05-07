@@ -24,6 +24,7 @@ public sealed class DreamObjectTree {
     public TreeEntry[] Types { get; private set; }
     public List<DreamProc> Procs { get; } = new();
     public List<string> Strings { get; private set; } //TODO: Store this somewhere else
+    public Dictionary<string, int> StringToId { get; private set; } = new();
     public DreamProc? GlobalInitProc { get; private set; }
 
     public TreeEntry Root { get; private set; } = default!;
@@ -91,6 +92,8 @@ public sealed class DreamObjectTree {
         _entitySystemManager.TryGetEntitySystem(out _particlesSystem);
 
         Strings = json.Strings;
+        for (int i = 0; i < Strings.Count; i++)
+            StringToId[Strings[i]] = i;
 
         if (json.GlobalInitProc is { } initProcDef) {
             GlobalInitProc = new DMProc(0, Root, initProcDef, "<global init>", _dreamManager, _refManager, _atomManager, _dreamMapManager, _dreamDebugManager, _dreamResourceManager, this, _procScheduler, _verbSystem);

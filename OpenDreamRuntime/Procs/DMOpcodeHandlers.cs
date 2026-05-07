@@ -815,7 +815,7 @@ namespace OpenDreamRuntime.Procs {
         }
 
         public static ProcStatus PushString(DMProcState state) {
-            state.Push(new DreamValue(state.ReadString()));
+            state.Push(DreamValue.FromStringId(state.ReadInt()));
             return ProcStatus.Continue;
         }
 
@@ -2847,7 +2847,7 @@ namespace OpenDreamRuntime.Procs {
             var reference = state.ReadReference();
             using var refValue = state.GetReferenceValue(reference);
 
-            var index = new DreamValue(state.ReadString());
+            var index = DreamValue.FromStringId(state.ReadInt());
             using var indexResult = state.GetIndex(refValue, index, state);
 
             state.Push(indexResult);
@@ -3251,9 +3251,9 @@ namespace OpenDreamRuntime.Procs {
             int count = state.ReadInt();
 
             for (int i = 0; i < count; i++) {
-                string str = state.ReadString();
+                var strId = state.ReadInt();
 
-                state.Push(new DreamValue(str));
+                state.Push(DreamValue.FromStringId(strId));
             }
 
             return ProcStatus.Continue;
@@ -3296,10 +3296,10 @@ namespace OpenDreamRuntime.Procs {
         }
 
         public static ProcStatus PushStringFloat(DMProcState state) {
-            string str = state.ReadString();
+            int strId = state.ReadInt();
             float flt = state.ReadFloat();
 
-            state.Push(new DreamValue(str));
+            state.Push(DreamValue.FromStringId(strId));
             state.Push(new DreamValue(flt));
 
             return ProcStatus.Continue;
@@ -3355,10 +3355,10 @@ namespace OpenDreamRuntime.Procs {
             int count = state.ReadInt();
 
             for (int i = 0; i < count; i++) {
-                string str = state.ReadString();
+                var strId = state.ReadInt();
                 float flt = state.ReadFloat();
 
-                state.Push(new DreamValue(str));
+                state.Push(DreamValue.FromStringId(strId));
                 state.Push(new DreamValue(flt));
             }
 
@@ -3404,9 +3404,9 @@ namespace OpenDreamRuntime.Procs {
             var list = state.Proc.ObjectTree.CreateList(size);
 
             for (int i = 0; i < size; i++) {
-                string str = state.ReadString();
+                var strId = state.ReadInt();
 
-                list.AddValue(new DreamValue(str));
+                list.AddValue(DreamValue.FromStringId(strId));
             }
 
             state.Push(new DreamValue(list));

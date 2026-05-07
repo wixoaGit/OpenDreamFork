@@ -219,7 +219,7 @@ public sealed class DreamRefManager {
 
             case RefType.String:
                 return _objectTree.Strings.Count > refId
-                    ? new DreamValue(_objectTree.Strings[(int)refId])
+                    ? DreamValue.FromStringId((int)refId)
                     : DreamValue.Null;
             case RefType.DreamType:
                 return _objectTree.Types.Length > refId
@@ -314,13 +314,10 @@ public sealed class DreamRefManager {
     /// </remarks>
     /// <returns>A string's ID, or null if it hasn't been added to the DM string list</returns>
     public uint? FindStringId(string str) {
-        int idx = _objectTree.Strings.IndexOf(str);
+        if (_objectTree.StringToId.TryGetValue(str, out var idx))
+            return (uint)idx;
 
-        if (idx < 0) {
-            return null;
-        }
-
-        return (uint)idx;
+        return null;
     }
 
     /// <summary>
@@ -335,7 +332,10 @@ public sealed class DreamRefManager {
     /// <summary>
     /// Grabs a DreamObject from its bucket using its ref
     /// </summary>
-    private DreamObject? GetFromBucket(uint @ref) {
+    public DreamObject? GetFromBucket(uint @ref) {
+        if (@ref == 0)
+            return null;
+
         var refType = (RefType)(@ref & RefTypeMask);
         var refId = (int)(@ref & RefIdMask);
         var bucket = _buckets[refType];
@@ -349,8 +349,9 @@ public sealed class DreamRefManager {
     private uint FindOrAddString(string str) {
         var idx = FindStringId(str);
         if (idx == null) {
+            _objectTree.StringToId[str] = _objectTree.Strings.Count;
+            idx = (uint)(_objectTree.Strings.Count);
             _objectTree.Strings.Add(str);
-            idx = (uint)(_objectTree.Strings.Count - 1);
         }
 
         return idx.Value;

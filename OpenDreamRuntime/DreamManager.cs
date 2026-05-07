@@ -62,6 +62,9 @@ public sealed partial class DreamManager {
         _sawmill = Logger.GetSawmill("opendream");
         ListPoolThreshold = _config.GetCVar(OpenDreamCVars.ListPoolThreshold);
         ListPoolSize = _config.GetCVar(OpenDreamCVars.ListPoolSize);
+        DreamValue.RefManager = _refManager;
+        DreamValue.ObjectTree = _objectTree;
+        DreamValue.ResourceManager = _dreamResourceManager;
         ByondApi.ByondApi.Initialize(this, _refManager, _atomManager, _dreamMapManager, _objectTree);
 
         InitializeConnectionManager();
